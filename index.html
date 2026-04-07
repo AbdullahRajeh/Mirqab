@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coordinate Pin Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="map" class="map" role="application" aria-label="Riyadh map"></div>
+
+    <section class="overlay" aria-label="Coordinate controls">
+      <p class="eyebrow">Riyadh Pin</p>
+      <h1>Place pins with precise coordinates</h1>
+
+      <form id="coords-form" class="coords-form" novalidate>
+        <label for="lat">Latitude</label>
+        <input id="lat" name="lat" type="number" step="any" placeholder="e.g. 24.7136" required />
+
+        <label for="lng">Longitude</label>
+        <input id="lng" name="lng" type="number" step="any" placeholder="e.g. 46.6753" required />
+
+        <button type="submit">Place Pin</button>
+      </form>
+
+      <div class="actions">
+        <button type="button" id="open-dashboard" class="dashboard-link">Open Active Dashboard</button>
+      </div>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </section>
+
+    <!-- Slide-in Dashboard -->
+    <aside id="dashboard-panel" class="dashboard-panel">
+      <header class="dashboard-head">
+        <div>
+          <p class="eyebrow">Active Dashboard</p>
+          <h2>Riyadh Location Activity</h2>
+        </div>
+        <button type="button" id="close-dashboard" class="close-btn" aria-label="Close Dashboard">✕</button>
+      </header>
+
+      <section class="stats">
+        <div class="card">
+          <h3>Total Pins</h3>
+          <p id="total-pins" class="value">0</p>
+        </div>
+        <div class="card">
+          <h3>Latest Pin</h3>
+          <p id="latest-pin" class="value small">No pins yet</p>
+        </div>
+        <div class="card">
+          <h3>Center Point</h3>
+          <p id="center-point" class="value small">-</p>
+        </div>
+      </section>
+
+      <section class="table-wrap">
+        <div class="table-head">
+          <h3>Saved Pins</h3>
+          <button id="clear-pins" type="button" class="danger-btn">Clear All</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>LAT / LNG</th>
+                <th>CREATED</th>
+              </tr>
+            </thead>
+            <tbody id="pins-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+
+    <script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
