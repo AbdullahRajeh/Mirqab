@@ -1,0 +1,529 @@
+﻿:root {
+    --bg-app: #1B0C0C;
+    --panel-bg: rgba(49, 62, 23, 0.8);
+    --panel-border: rgba(255, 222, 66, 0.15);
+    --text-main: #FFDE42;
+    --text-muted: #a3b185;
+    --text-lighter: #e6edcb;
+    --accent: #FFDE42;
+    --accent-hover: #e0c226;
+    --accent-glow: rgba(255, 222, 66, 0.4);
+    --danger: #4C5C2D;
+    --danger-bg: rgba(76, 92, 45, 0.2);
+    --danger-border: rgba(76, 92, 45, 0.4);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 40px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--panel-border);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  height: 100vh;
+  font-family: "Tajawal", system-ui, -apple-system, sans-serif;
+  color: var(--text-main);
+  background: var(--bg-app);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Chill Marker */
+.fancy-marker {
+  width: 14px;
+  height: 14px;
+  background-color: var(--accent);
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 12px var(--accent-glow), 0 0 0 4px rgba(255,255,255,0.1);
+  cursor: pointer;
+}
+.fancy-marker:hover {
+  background-color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 0 6px rgba(255,222,66,0.2);
+}
+
+@keyframes smoothPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(20px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.maplibregl-popup {
+  padding-bottom: 5px; /* Creates spacing from the pin marker */
+  max-width: none !important; /* Prevent MapLibre from restricting the parent container */
+}
+
+.maplibregl-popup-content {
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-family: "Tajawal", sans-serif;
+  padding: 1.25rem;
+  background: rgba(49, 62, 23, 0.9); /* Deep slate translucent */
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: var(--text-main);
+  animation: smoothPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transform-origin: bottom center;
+}
+
+/* Ensure the tiny tip/arrow perfectly matches the translucent glass border */
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: rgba(49, 62, 23, 0.9);
+  margin-top: -1px;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: rgba(49, 62, 23, 0.9);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: rgba(49, 62, 23, 0.9);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: rgba(49, 62, 23, 0.9);
+}
+
+/* Hide Maplibre closing button as we use our own flow or rely on hovering/clicking */
+.maplibregl-popup-close-button {
+  display: none !important;
+}
+
+/* Overlay / Mini Control Panel */
+.app-logo-float {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 601;
+  width: 260px;
+  height: 140px;
+  background-color: var(--text-main);
+  -webkit-mask: url('../assets/logo.svg') no-repeat right bottom / contain;
+  mask: url('../assets/logo.svg') no-repeat right bottom / contain;
+  filter: drop-shadow(0 0 10px var(--accent-glow));
+  transition: transform 0.3s ease;
+}
+
+.app-logo-float:hover {
+  transform: scale(1.05) rotate(-2deg);
+}
+
+.app-logo-float img {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  top: 10.75rem;
+  right: 1.5rem;
+  z-index: 500;
+  width: 320px;
+  max-width: calc(100vw - 3rem);
+  padding: 1.75rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+h1 {
+  font-size: 1.6rem;
+  color: var(--text-main);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.brand-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.app-logo {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 0 10px var(--accent-glow));
+  transition: transform 0.3s ease;
+}
+
+.app-logo:hover {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+.brand-text h1 {
+  margin: 0;
+  line-height: 1.1;
+}
+
+.brand-text .eyebrow {
+  margin-bottom: 0.2rem;
+}
+
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+button {
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: "Tajawal", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+button#simulate-ai {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+button#simulate-ai:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dashboard-link {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.dashboard-link:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+.message {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 1.2rem;
+}
+.message.error {
+  color: var(--danger);
+}
+
+/* Dashboard Sidebar */
+.dashboard-panel {
+    position: absolute;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    left: -480px;
+    width: 420px;
+    max-width: calc(100vw - 3rem);
+    max-height: calc(100dvh - 3rem);
+    z-index: 600;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+  gap: 1rem;
+    transition: left 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  }
+
+.dashboard-panel > * {
+    pointer-events: auto;
+    background: var(--panel-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 1.5rem;
+    margin: 0;
+  }
+
+  .dashboard-head,
+  .stats,
+  .mini-metrics,
+  .table-wrap {
+    flex: 0 0 auto;
+  }
+
+  .stats,
+  .mini-metrics,
+  .table-wrap {
+    min-height: 0;
+  }
+  
+  .dashboard-panel.open {
+  left: 1.5rem;
+}
+
+/* Header */
+.dashboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  }
+
+.dashboard-head h2 {
+  font-size: 1.5rem;
+  color: var(--text-main);
+  font-weight: 800;
+  margin-top: 0.25rem;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-main);
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.stats .card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.stats .card:first-child {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(255, 222, 66, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border-color: rgba(255, 222, 66, 0.2);
+}
+
+.card h3 {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.value {
+  margin-top: 0.5rem;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1;
+}
+.value.small {
+  font-size: 1.25rem;
+  margin-top: 0.75rem;
+}
+
+/* Charts */
+#severityChart {
+  width: 100% !important;
+}
+
+/* Table Section */
+.table-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Important for flex-child scrolling */
+  margin-top: 1rem;
+}
+
+.table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.table-head h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.danger-btn {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  width: auto;
+}
+.danger-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.table-scroll {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@media (max-width: 1200px) {
+  .dashboard-panel {
+    width: min(52vw, 560px);
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-panel {
+    top: 5rem;
+    bottom: 1rem;
+    width: calc(100vw - 2rem);
+    max-width: none;
+    max-height: calc(100dvh - 6rem);
+    left: -100vw;
+  }
+
+  .dashboard-panel.open {
+    left: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-panel {
+    top: 5rem;
+    bottom: 1rem;
+    width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 6rem);
+  }
+
+  .overlay {
+    max-width: calc(100vw - 2rem);
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-panel > * {
+    padding: 1rem;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th, td {
+  text-align: right;
+  padding: 1rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+th {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+}
+
+td { 
+  color: var(--text-lighter); 
+}
+
+/* Hide MapLibre Control credits to keep it clean */
+.maplibregl-ctrl-bottom-right {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .app-logo-float {
+    top: 1rem;
+    right: 1rem;
+    width: 180px;
+    height: 100px;
+  }
+  .overlay {
+    top: 7.75rem;
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+  .dashboard-panel {
+    top: 5rem;
+    left: -100vw;
+    width: calc(100vw - 2rem);
+  }
+  .dashboard-panel.open {
+    left: 1rem;
+  }
+}
+

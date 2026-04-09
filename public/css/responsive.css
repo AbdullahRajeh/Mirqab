@@ -1,0 +1,23 @@
+@media (max-width: 640px) {
+  .app-logo-float {
+    top: 1rem;
+    right: 1rem;
+    width: 180px;
+    height: 100px;
+  }
+  .overlay {
+    top: 7.75rem;
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+  .dashboard-panel {
+    top: 5rem;
+    left: -100vw;
+    width: calc(100vw - 2rem);
+  }
+  .dashboard-panel.open {
+    left: 1rem;
+  }
+  }
+}

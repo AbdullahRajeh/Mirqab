@@ -11,13 +11,13 @@
       rel="stylesheet"
     />
     <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="css/main.css" />
   </head>
   <body>
     <div id="map" class="map" dir="ltr" role="application" aria-label="Riyadh map"></div>
 
     <div class="app-logo-float">
-      <img src="logo.svg" alt="Mirqab Logo" />
+      <img src="assets/logo.svg" alt="Mirqab Logo" />
     </div>
 
     <section class="overlay" aria-label="Coordinate controls">
@@ -34,6 +34,7 @@
       <p id="message" class="message" aria-live="polite"></p>
     </section>
 
+    <!-- Slide-in Dashboard -->
     <aside id="dashboard-panel" class="dashboard-panel">
       <header class="dashboard-head">
         <div>
@@ -56,10 +57,49 @@
           <h3>متوسط الثقة</h3>
           <p id="avg-confidence" class="value small" style="color:var(--accent);">0%</p>
         </div>
+        <div class="card">
+          <h3>تم رصدها اليوم</h3>
+          <p id="today-pins" class="value small">0</p>
+        </div>
+        <div class="card">
+          <h3>خلال آخر 7 أيام</h3>
+          <p id="week-pins" class="value small">0</p>
+        </div>
+        <div class="card">
+          <h3>نسبة التحقق</h3>
+          <p id="verified-rate" class="value small">0%</p>
+        </div>
+        <div class="card">
+          <h3>أقدم اكتشاف</h3>
+          <p id="oldest-pin-age" class="value small">-</p>
+        </div>
+        <div class="card">
+          <h3>أحدث اكتشاف</h3>
+          <p id="newest-pin-time" class="value small">-</p>
+        </div>
+        <div class="card">
+          <h3>متوسط عمر البلاغ</h3>
+          <p id="avg-age" class="value small">-</p>
+        </div>
       </section>
       
       <section>
          <canvas id="severityChart" height="180"></canvas>
+      </section>
+
+      <section class="mini-metrics">
+        <div class="mini-card">
+          <span>خفيف</span>
+          <strong id="low-severity-count">0</strong>
+        </div>
+        <div class="mini-card">
+          <span>متوسط</span>
+          <strong id="mid-severity-count">0</strong>
+        </div>
+        <div class="mini-card">
+          <span>عالي</span>
+          <strong id="high-severity-count">0</strong>
+        </div>
       </section>
 
       <section class="table-wrap">
@@ -85,6 +125,8 @@
 
     <script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="script.js"></script>
+    
+    <script type="module" src="js/main.js"></script>
   </body>
+
 </html>
