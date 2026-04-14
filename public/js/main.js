@@ -1,36 +1,59 @@
-const riyadhBounds = [
-  [46.45, 24.35],
-  [47.15, 25.05]
-];
+const RIYADH_CENTER = [46.6753, 24.7136];
+const RETURN_DISTANCE_KM = 120;
+const RIYADH_VISIBLE_RADIUS_KM = 40;
 
-const map = new maplibregl.Map({
-  container: 'map',
-  style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',        
-  center: [46.8, 24.7],
-  zoom: 10,
-  minZoom: 6,
-  maxZoom: 16,
-  pitch: 45,
-  bearing: -10,
-  attributionControl: false
-});
+function distanceKm(fromLngLat, toLngLat) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
 
-map.on('moveend', () => {
-  const center = map.getCenter();
-  if (
-    center.lng < 46.2 || center.lng > 47.4 ||
-    center.lat < 24.1 || center.lat > 25.3
-  ) {
-    map.flyTo({
-      center: [46.8, 24.7],
+  const lat1 = toRad(fromLngLat[1]);
+  const lat2 = toRad(toLngLat[1]);
+  const deltaLat = toRad(toLngLat[1] - fromLngLat[1]);
+  const deltaLng = toRad(toLngLat[0] - fromLngLat[0]);
+
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusKm * c;
+}
+
+const mapElement = document.getElementById('map');
+const map = mapElement
+  ? new maplibregl.Map({
+      container: 'map',
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      center: RIYADH_CENTER,
       zoom: 10,
-      pitch: 0,
-      bearing: 0,
-      speed: 1.2,
-      essential: true
-    });
-  }
-});
+      minZoom: 9.5,
+      maxZoom: 16,
+      pitch: 45,
+      bearing: -10,
+      renderWorldCopies: false,
+      attributionControl: false
+    })
+  : null;
+
+if (map) {
+  map.on('moveend', () => {
+    const center = map.getCenter();
+    const currentDistanceKm = distanceKm([center.lng, center.lat], RIYADH_CENTER);
+
+    if (currentDistanceKm > RETURN_DISTANCE_KM) {
+      map.flyTo({
+        center: RIYADH_CENTER,
+        zoom: 10,
+        pitch: 45,
+        bearing: -10,
+        speed: 0.5,
+        curve: 1.35,
+        duration: 2200,
+        essential: true
+      });
+    }
+  });
+}
 
 const simulateAiBtn = document.getElementById("simulate-ai");
 const message = document.getElementById("message");
@@ -41,16 +64,12 @@ const openDashBtn = document.getElementById("open-dashboard");
 const closeDashBtn = document.getElementById("close-dashboard");
 const totalPinsEl = document.getElementById("total-pins");
 const worstHoodEl = document.getElementById("worst-hood");
-const avgConfidenceEl = document.getElementById("avg-confidence");
-const todayPinsEl = document.getElementById("today-pins");
-const weekPinsEl = document.getElementById("week-pins");
-const verifiedRateEl = document.getElementById("verified-rate");
-const oldestPinAgeEl = document.getElementById("oldest-pin-age");
-const newestPinTimeEl = document.getElementById("newest-pin-time");
-const avgAgeEl = document.getElementById("avg-age");
-const lowSeverityCountEl = document.getElementById("low-severity-count");
-const midSeverityCountEl = document.getElementById("mid-severity-count");
-const highSeverityCountEl = document.getElementById("high-severity-count");
+const urgentPinsEl = document.getElementById("urgent-pins");
+  const inProgressPinsEl = document.getElementById("in-progress-pins");
+  const fixedPinsEl = document.getElementById("fixed-pins");
+  const todayPinsEl = document.getElementById("today-pins");
+  const weekPinsEl = document.getElementById("week-pins");
+  const avgResponseTimeEl = document.getElementById("avg-response-time");
 const pinsBody = document.getElementById("pins-body");
 const clearPinsBtn = document.getElementById("clear-pins");
 let severityChartInstance = null;
@@ -58,34 +77,139 @@ let severityChartInstance = null;
 const pins = readPins();
 const markersMap = new Map();
 
-if (openDashBtn) {
+if (pinsBody) {
+  renderDashboard();
+}
+
+if (openDashBtn && dashboardPanel) {
   openDashBtn.addEventListener("click", () => {
     dashboardPanel.classList.add("open");
     renderDashboard();
   });
 }
 
-if (closeDashBtn) {
+if (closeDashBtn && dashboardPanel) {
   closeDashBtn.addEventListener("click", () => {
     dashboardPanel.classList.remove("open");
   });
 }
 
-function createGeoJSONCircle(center, radiusInKm, points = 64) {
-  const coords = { latitude: center[1], longitude: center[0] };
-  const distanceX = radiusInKm / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
+function createGeoJSONCircle(center, radiusInKm, points = 360) {
+  const latitude = center[1];
+  const longitude = center[0];
+  const distanceX = radiusInKm / (111.32 * Math.cos((latitude * Math.PI) / 180));
   const distanceY = radiusInKm / 111.32;
-  const ret = [];
+  const ring = [];
+
   for (let i = 0; i < points; i++) {
-    const theta = (i / points) * (2 * Math.PI);
+    const theta = (i / points) * 2 * Math.PI;
     const x = distanceX * Math.cos(theta);
     const y = distanceY * Math.sin(theta);
-    ret.push([coords.longitude + x, coords.latitude + y]);
+    ring.push([longitude + x, latitude + y]);
   }
-  ret.push(ret[0]);
-  return ret.reverse();
+
+  ring.reverse();
+  ring.push(ring[0]);
+  return ring;
 }
 
+const spaceOverlay = document.getElementById('space-overlay');
+const spaceCtx = spaceOverlay ? spaceOverlay.getContext('2d') : null;
+const riyadhBoundaryCoords = createGeoJSONCircle(RIYADH_CENTER, RIYADH_VISIBLE_RADIUS_KM, 360);
+
+function resizeCanvas() {
+  if (!spaceOverlay) return;
+  spaceOverlay.width = window.innerWidth;
+  spaceOverlay.height = window.innerHeight;
+}
+
+if (spaceOverlay) {
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+}
+
+const _particles = Array.from({ length: 400 }, () => {
+  let pLng, pLat, dist;
+  do {
+    pLng = RIYADH_CENTER[0] + (Math.random() - 0.5) * 8;
+    pLat = RIYADH_CENTER[1] + (Math.random() - 0.5) * 8;
+    dist = distanceKm([pLng, pLat], RIYADH_CENTER);
+  } while (dist < RIYADH_VISIBLE_RADIUS_KM - 2);
+
+  return {
+    lng: pLng,
+    lat: pLat,
+    dlng: (Math.random() - 0.5) * 0.001,
+    dlat: (Math.random() - 0.5) * 0.001,
+    radius: Math.random() * 1.5 + 0.6
+  };
+});
+
+function animateSpace() {
+  if (!spaceCtx || !map) return requestAnimationFrame(animateSpace);
+
+  const w = spaceOverlay.width;
+  const h = spaceOverlay.height;
+
+  spaceCtx.clearRect(0, 0, w, h);
+
+  const projectedNodes = [];
+
+  for (let p of _particles) {
+    p.lng += p.dlng;
+    p.lat += p.dlat;
+    
+    if (Math.abs(p.lng - RIYADH_CENTER[0]) > 4) p.dlng *= -1;
+    if (Math.abs(p.lat - RIYADH_CENTER[1]) > 4) p.dlat *= -1;
+
+    // Bounce particles off the Riyadh perimeter instead of floating over/under it
+    const centerDist = distanceKm([p.lng, p.lat], RIYADH_CENTER);
+    if (centerDist < RIYADH_VISIBLE_RADIUS_KM) {
+      p.lng -= p.dlng * 2;
+      p.lat -= p.dlat * 2;
+      p.dlng *= -1;
+      p.dlat *= -1;
+    }
+
+    const proj = map.project([p.lng, p.lat]);
+    if (proj.x > -200 && proj.x < w + 200 && proj.y > -200 && proj.y < h + 200) {
+      projectedNodes.push({ x: proj.x, y: proj.y, radius: p.radius });
+    }
+  }
+
+  spaceCtx.lineWidth = 1;
+  for (let i = 0; i < projectedNodes.length; i++) {
+    for (let j = i + 1; j < projectedNodes.length; j++) {
+      const dx = projectedNodes[i].x - projectedNodes[j].x;
+      const dy = projectedNodes[i].y - projectedNodes[j].y;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq < 14400) {
+        const dist = Math.sqrt(distSq);
+        spaceCtx.beginPath();
+        spaceCtx.moveTo(projectedNodes[i].x, projectedNodes[i].y);
+        spaceCtx.lineTo(projectedNodes[j].x, projectedNodes[j].y);
+        spaceCtx.strokeStyle = `rgba(255, 255, 255, ${0.35 * (1 - dist / 120)})`;
+        spaceCtx.stroke();
+      }
+    }
+  }
+
+  spaceCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  for (let p of projectedNodes) {
+    spaceCtx.beginPath();
+    spaceCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    spaceCtx.fill();
+  }
+
+  requestAnimationFrame(animateSpace);
+}
+
+if (spaceOverlay) {
+  requestAnimationFrame(animateSpace);
+}
+
+if (map) {
 map.on('load', () => {
   maplibregl.setRTLTextPlugin(
     'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
@@ -111,31 +235,20 @@ map.on('load', () => {
       geometry: {
         type: 'Polygon',
         coordinates: [
-          [ [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90] ],      
-          createGeoJSONCircle([46.8, 24.7], 50)
+          [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]],
+          createGeoJSONCircle(RIYADH_CENTER, RIYADH_VISIBLE_RADIUS_KM, 360)
         ]
       }
     }
   });
 
   map.addLayer({
-    id: 'mask-fill',
+    id: 'riyadh-mask-fill',
     type: 'fill',
     source: 'riyadh-mask',
     paint: {
-      'fill-color': '#1B0C0C',
-      'fill-opacity': 0.85
-    }
-  });
-
-  map.addLayer({
-    id: 'mask-outline',
-    type: 'line',
-    source: 'riyadh-mask',
-    paint: {
-      'line-color': '#FFDE42',
-      'line-width': 1.5,
-      'line-opacity': 0.2
+      'fill-color': '#050505',
+      'fill-opacity': 0.95
     }
   });
 
@@ -147,6 +260,7 @@ map.on('load', () => {
     setMessage(`تم تحميل ${pins.length} اكتشافات محفوظة.`);  
   }
 });
+}
 
 function setMessage(text, isError = false) {
   if (!message) return;
@@ -158,9 +272,16 @@ function readPins() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    let parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(pin => pin && typeof pin === "object" && Number.isFinite(pin.lat) && Number.isFinite(pin.lng));
+    
+    return parsed.map(pin => {
+      if (pin && typeof pin === "object") {
+        pin.lat = parseFloat(pin.lat);
+        pin.lng = parseFloat(pin.lng);
+      }
+      return pin;
+    }).filter(pin => pin && typeof pin === "object" && Number.isFinite(pin.lat) && Number.isFinite(pin.lng));
   } catch {
     return [];
   }
@@ -222,12 +343,14 @@ window.deletePin = function(id) {
   savePins();
   setMessage('تم حذف المؤشر بنجاح.', false);
 
-  map.flyTo({
-    zoom: Math.max(map.getZoom() - 3, 10),
-    pitch: 0,
-    duration: 2000,
-    essential: true
-  });
+  if (map) {
+    map.flyTo({
+      zoom: Math.max(map.getZoom() - 3, 10),
+      pitch: 0,
+      duration: 2000,
+      essential: true
+    });
+  }
 };
 
 window.verifyPin = function(id) {
@@ -237,8 +360,8 @@ window.verifyPin = function(id) {
   pin.verified = !pin.verified;
   const marker = markersMap.get(id);
   if (marker) {
-    marker.getElement().style.backgroundColor = pin.verified ? '#4ade80' : '#FFDE42';
-    if (marker.customPopup) {
+    marker.getElement().style.backgroundColor = pin.verified ? '#ffffff' : '#d9d9d9';
+    if (marker.customPopup && map) {
       marker.customPopup.setHTML(getPopupHTML(pin, true)).setLngLat([pin.lng, pin.lat]).addTo(map);
     }
   }
@@ -251,28 +374,28 @@ function getPopupHTML(pin, isExpanded) {
   const defaultImg = 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=80';
   const conf = pin.confidence || 85;
   const hood = pin.neighborhood || "حي غير معروف";
-  const verifiedBadge = pin.verified ? '<span style="color:#FFDE42; margin-left:6px; font-size:1rem;" title="معتمد">&#10004;</span>' : '';
-  
+  const verifiedBadge = pin.verified ? '<span class="pin-popup__verified" title="معتمد">&#10004;</span>' : '';
+
   let html = `
-    <div style="min-width: 240px; width: ; box-sizing:border-box; overflow:hidden; padding: 4px; transition: all 0.3s ease;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; flex-direction: row-reverse; gap: 8px; flex-wrap: nowrap;">
-        <strong style="color:var(--text-main); font-size:1.1em; display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">عيب #${pin.id} ${verifiedBadge}</strong>
-        <span style="font-size:0.75rem; padding: 2px 6px; border-radius: 4px; background: #1B0C0C; border: 1px solid #4C5C2D; color: #FFDE42; font-weight: bold; white-space:nowrap; flex-shrink:0;">${conf}% ثقة</span>
+    <div class="pin-popup ${isExpanded ? 'pin-popup--expanded' : ''}" dir="rtl">
+      <div class="pin-popup__head">
+        <span class="pin-popup__confidence">${conf}% ثقة</span>
+        <strong class="pin-popup__title">عيب #${pin.id} ${verifiedBadge}</strong>
       </div>
-      <img src="${pin.imageUrl || defaultImg}" style="width: 100%; height: ${isExpanded ? '180px' : '120px'}; object-fit: cover; border-radius: 8px; margin-bottom: 8px; transition: height 0.3s ease;" alt="Road defect">
-      <div style="color:var(--text-muted); font-size:0.8em; margin-bottom: ${isExpanded ? '12px' : '4px'}; line-height: 1.4; text-align: right;">
-        <strong style="color: var(--text-main);">الحي:</strong> ${hood}<br>
-        <strong style="color: var(--text-main);">الإحداثيات:</strong>  ${pin.lat.toFixed(4)}, ${pin.lng.toFixed(4)}
+      <img src="${pin.imageUrl || defaultImg}" class="pin-popup__image ${isExpanded ? 'is-expanded' : ''}" alt="Road defect">
+      <div class="pin-popup__meta">
+        <p><span>الحي:</span> ${hood}</p>
+        <p><span>الإحداثيات:</span> ${pin.lat.toFixed(4)}, ${pin.lng.toFixed(4)}</p>
       </div>
   `;
   
   if (isExpanded) {
     html += `
-      <div style="display: flex; gap: 8px; margin-top: 8px; flex-direction: row-reverse; gap: 8px; flex-wrap: nowrap;">
-        <button onclick="window.verifyPin(${pin.id})" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='none'" style="flex:1; background:${pin.verified ? '#313E17' : '#4C5C2D'}; color:#FFF; border: 1px solid #FFDE42; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; white-space:nowrap; flex-shrink:0; transition: all 0.2s ease;">
+      <div class="pin-popup__actions">
+        <button onclick="window.verifyPin(${pin.id})" class="pin-popup__btn pin-popup__btn--verify ${pin.verified ? 'is-verified' : ''}">
           ${pin.verified ? '✓ معتمد' : 'تأكيد الاكتشاف'}
         </button>
-        <button onclick="window.deletePin(${pin.id})" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'" style="flex:1; background:rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); color:#ef4444; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; white-space:nowrap; flex-shrink:0; transition: all 0.2s ease;">
+        <button onclick="window.deletePin(${pin.id})" class="pin-popup__btn pin-popup__btn--delete">
           إلغاء (خطأ)
         </button>
       </div>
@@ -284,11 +407,18 @@ function getPopupHTML(pin, isExpanded) {
 }
 
 function drawPin(pin, openPopup) {
+  if (!map) return;
+
   const el = document.createElement('div');
   el.className = 'fancy-marker';
-  el.style.backgroundColor = pin.verified ? '#4ade80' : '#FFDE42';
+  el.style.backgroundColor = pin.verified ? '#ffffff' : '#d9d9d9';
 
-  const popup = new maplibregl.Popup({ offset: 10, closeButton: false })
+  const popup = new maplibregl.Popup({
+    offset: 10,
+    closeButton: false,
+    className: 'pin-popup-shell',
+    maxWidth: 'none'
+  })
     .setHTML(getPopupHTML(pin, false));
 
   const marker = new maplibregl.Marker({ element: el })
@@ -339,22 +469,19 @@ function renderDashboard() {
 
   if (pins.length === 0) {
     if (worstHoodEl) worstHoodEl.textContent = '-';
-    if (avgConfidenceEl) avgConfidenceEl.textContent = '0%';
-    if (todayPinsEl) todayPinsEl.textContent = '0';
-    if (weekPinsEl) weekPinsEl.textContent = '0';
-    if (verifiedRateEl) verifiedRateEl.textContent = '0%';
-    if (oldestPinAgeEl) oldestPinAgeEl.textContent = '-';
-    if (newestPinTimeEl) newestPinTimeEl.textContent = '-';
-    if (avgAgeEl) avgAgeEl.textContent = '-';
-    if (lowSeverityCountEl) lowSeverityCountEl.textContent = '0';
-    if (midSeverityCountEl) midSeverityCountEl.textContent = '0';
-    if (highSeverityCountEl) highSeverityCountEl.textContent = '0';
+    if (urgentPinsEl) urgentPinsEl.textContent = '0';
+      if (inProgressPinsEl) inProgressPinsEl.textContent = '0';
+      if (fixedPinsEl) fixedPinsEl.textContent = '0';
+      if (todayPinsEl) todayPinsEl.textContent = '0';
+      if (weekPinsEl) weekPinsEl.textContent = '0';
+      if (avgResponseTimeEl) avgResponseTimeEl.textContent = '-';
     if (pinsBody) pinsBody.innerHTML = "<tr><td colspan=\"4\" style=\"text-align:center; color: var(--text-muted); padding: 2rem 0;\">لا توجد اكتشافات بعد.</td></tr>";
     renderChart({});
     return;
   }
 
-  let totalConfidence = 0;
+  let urgentCount = 0;
+    let pendingCount = 0;
   const hoodCounts = {};
   const now = Date.now();
   const startOfToday = new Date();
@@ -367,12 +494,12 @@ function renderDashboard() {
   let ageCount = 0;
   let oldestPin = null;
   let newestPin = null;
-  const severityCounts = { low: 0, mid: 0, high: 0 };
+  
 
   pins.forEach(p => {
     const conf = p.confidence || 85;
     const hood = p.neighborhood || "حي غير معروف";
-    totalConfidence += conf;
+    if (conf >= 90) urgentCount++;
     hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
 
     const createdAt = parsePinTime(p);
@@ -387,22 +514,18 @@ function renderDashboard() {
 
     if (p.verified) verifiedCount += 1;
 
-    if (conf < 80) severityCounts.low += 1;
-    else if (conf < 90) severityCounts.mid += 1;
-    else severityCounts.high += 1;
+    if (!p.verified) pendingCount++;
   });
 
-  const avgConf = Math.round(totalConfidence / pins.length);
-  if (avgConfidenceEl) avgConfidenceEl.textContent = avgConf + '%';
-  if (todayPinsEl) todayPinsEl.textContent = String(todayCount);
-  if (weekPinsEl) weekPinsEl.textContent = String(weekCount);
-  if (verifiedRateEl) verifiedRateEl.textContent = `${Math.round((verifiedCount / pins.length) * 100)}%`;
-  if (oldestPinAgeEl) oldestPinAgeEl.textContent = oldestPin ? formatRelativeTime(oldestPin) : '-';
-  if (newestPinTimeEl) newestPinTimeEl.textContent = newestPin ? formatAbsoluteTime(newestPin) : '-';
-  if (avgAgeEl) avgAgeEl.textContent = ageCount ? formatRelativeTime(new Date(now - (totalAgeMs / ageCount))) : '-';
-  if (lowSeverityCountEl) lowSeverityCountEl.textContent = String(severityCounts.low);
-  if (midSeverityCountEl) midSeverityCountEl.textContent = String(severityCounts.mid);
-  if (highSeverityCountEl) highSeverityCountEl.textContent = String(severityCounts.high);
+  const fixedCount = Math.floor(pins.length * 0.15) || 0; // Mock 15% fixed rate
+    
+    if (urgentPinsEl) urgentPinsEl.textContent = String(urgentCount);
+    if (inProgressPinsEl) inProgressPinsEl.textContent = String(pins.length - fixedCount);
+    if (fixedPinsEl) fixedPinsEl.textContent = String(fixedCount);
+    if (todayPinsEl) todayPinsEl.textContent = String(todayCount);
+    if (weekPinsEl) weekPinsEl.textContent = String(weekCount);
+    if (avgResponseTimeEl) avgResponseTimeEl.textContent = ageCount ? 
+      Math.max(12, Math.round((totalAgeMs / ageCount) / 3600000)) + " ساعة" : "48 ساعة";
 
   let maxCount = 0;
   let worstHood = '-';
@@ -427,16 +550,18 @@ function renderDashboard() {
     const hood = pin.neighborhood || "حي غير معروف";
 
     row.innerHTML = `
-      <td><img src="${pin.imageUrl || defaultImg}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
-      <td style="font-weight:600; font-size:0.8rem;">${hood}</td>
+      <td><img src="${pin.imageUrl || defaultImg}" class="pin-row__img" alt="صورة العيب"></td>
+      <td class="pin-row__hood">${hood}</td>
       <td>
-        <div style="background:#e2e8f0; border-radius:4px; height:6px; width:100%; margin-top:3px;">
-          <div style="background:#FFDE42; height:100%; border-radius:4px; width:${conf}%;"></div>
+        <div class="pin-row__confidence">
+          <div class="pin-row__bar">
+            <div class="pin-row__bar-fill" style="width:${conf}%;"></div>
+          </div>
+          <span class="pin-row__value">${conf}%</span>
         </div>
-        <span style="font-size:0.7rem; color:var(--text-muted);">${conf}%</span>
       </td>
       <td>
-        <button onclick="flyToPin(${pin.id})" style="background:#313E17; color:#fff; border:none; cursor:pointer; padding: 4px 8px; border-radius:4px; font-size:0.7rem;">عرض</button>
+        <button onclick="flyToPin(${pin.id})" class="pin-row__view-btn">عرض</button>
       </td>
     `;
     if (pinsBody) pinsBody.appendChild(row);
@@ -446,7 +571,7 @@ function renderDashboard() {
 }
 
 function renderChart(hoodCounts = {}) {
-  const ctx = document.getElementById('severityChart');
+  const ctx = document.getElementById('defectsChart');
   if (!ctx) return;
 
   const labels = Object.keys(hoodCounts).slice(0, 5);
@@ -466,7 +591,7 @@ function renderChart(hoodCounts = {}) {
         datasets: [{
           label: "العيوب حسب الحي",
           data: data,
-          backgroundColor: '#FFDE42',
+          backgroundColor: '#ffffff',
           borderRadius: 4
         }]
       },
@@ -509,6 +634,11 @@ window.stopAndDismiss = function(keepId = null, stopCamera = true) {
 
 
 window.flyToPin = function(id) {
+  if (!map) {
+    window.location.href = '/';
+    return;
+  }
+
   const pin = pins.find(p => p.id === id);
   if (pin) {
     window.stopAndDismiss(null, true);
@@ -543,9 +673,11 @@ window.flyToPin = function(id) {
 
 
 // Stop the orbit if the user manually drags the map
-map.on('dragstart', window.stopOrbit);
-// Also pause orbit on zoom start if necessary
-map.on('zoomstart', window.stopOrbit);
+if (map) {
+  map.on('dragstart', window.stopOrbit);
+  // Also pause orbit on zoom start if necessary
+  map.on('zoomstart', window.stopOrbit);
+}
 
 if (clearPinsBtn) {
   clearPinsBtn.addEventListener('click', () => {
@@ -553,7 +685,7 @@ if (clearPinsBtn) {
     markersMap.clear();
     pins.length = 0;
     localStorage.removeItem(STORAGE_KEY);
-    setMessage("ØªÙ… Ù…Ø³Ø Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª.", false);
+    setMessage("تم مسح جميع البيانات.", false);
     renderDashboard();
   });
 }
@@ -564,16 +696,19 @@ const riyadhHoods = [
   'Al Nakheel', 'Qurtubah', 'Al Sahafah'
 ];
 
-if (simulateAiBtn) {
+if (simulateAiBtn && map) {
   simulateAiBtn.addEventListener('click', async () => {
-    setMessage("Ø¬Ø§Ø±ÙŠ ÙØØµ Ø§Ù„Ø¥ØØ¯Ø§Ø«ÙŠØ§Øª... Ø¬Ù„Ø¨ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù Ù…ÙˆÙ‚Ø¹...", false);
+    setMessage("جاري فحص الاحداثيات... جلب بيانات الموقع...", false);
     simulateAiBtn.disabled = true;
 
     try {
-      const lat = 24.35 + Math.random() * (25.05 - 24.35);
-      const lng = 46.45 + Math.random() * (47.15 - 46.45);
+      const latOffset = (Math.random() - 0.5) * 2 * (RIYADH_VISIBLE_RADIUS_KM / 111.32);
+      const lngOffset = (Math.random() - 0.5) * 2 * (RIYADH_VISIBLE_RADIUS_KM / (111.32 * Math.cos(RIYADH_CENTER[1] * Math.PI / 180)));
+      
+      const lat = RIYADH_CENTER[1] + latOffset * 0.9;
+      const lng = RIYADH_CENTER[0] + lngOffset * 0.9;
 
-        let neighborhood = "حي غير معروف";
+      let neighborhood = "حي غير معروف";
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1&accept-language=ar`);
         const data = await response.json();
@@ -585,11 +720,11 @@ if (simulateAiBtn) {
                          data.address.village ||
                          data.address.town ||
                          data.address.city ||
-                         "Ø¶ÙˆØ§ØÙŠ Ø§Ù„Ø±ÙŠØ§Ø¶";
+                         "ضواحي الرياض";
         }
       } catch (err) {
-        console.error("ÙØ´Ù„ ØªØØ¯ÙŠØ¯ Ø§Ù„Ù…ÙˆÙ‚Ø¹:", err);
-        neighborhood = "Ù…Ù†Ø·Ù‚Ø© Ø§Ù„Ø±ÙŠØ§Ø¶";
+      console.error("فشل تحديد الموقع:", err);
+      neighborhood = "منطقة الرياض";
       }
 
       const confidence = Math.floor(75 + Math.random() * 24);
@@ -624,7 +759,7 @@ if (simulateAiBtn) {
         essential: true
       });
 
-      setMessage(`Ø§ÙƒØªØ´Ù Ø§Ù„Ø°ÙƒØ§Ø¡ Ø§Ù„Ø§ØµØ·Ù†Ø§Ø¹ÙŠ عيبØ§Ù‹ ÙÙŠ ${neighborhood} (Ø«Ù‚Ø© ${confideence}%)`);
+      setMessage(`اكتشف الذكاء الاصطناعي عيباً في ${neighborhood} (ثقة ${confidence}%)`);
     } finally {
       simulateAiBtn.disabled = false;
     }

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;700;800&family=Changa:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
     <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
@@ -15,19 +15,17 @@
   </head>
   <body>
     <div id="map" class="map" dir="ltr" role="application" aria-label="Riyadh map"></div>
-
-    <div class="app-logo-float">
-      <img src="assets/logo.svg" alt="Mirqab Logo" />
-    </div>
+    <canvas id="space-overlay" class="space-overlay" aria-hidden="true"></canvas>
 
     <section class="overlay" aria-label="Coordinate controls">
       <div class="brand-text">
+        <img src="assets/logo.svg" alt="Mirqab Logo" class="brand-logo" aria-hidden="true" />
         <p class="eyebrow">مرقب للذكاء الاصطناعي</p>
         <h1>مركز اكتشاف الحفر</h1>
       </div>
 
       <div class="actions">
-        <button type="button" id="simulate-ai" style="margin-bottom: 0.5rem; background: #313E17;">محاكاة الذكاء الاصطناعي</button>
+        <button type="button" id="simulate-ai" class="action-secondary">محاكاة الذكاء الاصطناعي</button>
         <button type="button" id="open-dashboard" class="dashboard-link">فتح لوحة التحليلات</button>
       </div>
 
@@ -50,59 +48,40 @@
           <p id="total-pins" class="value">0</p>
         </div>
         <div class="card">
-          <h3>الأكثر تضرراً</h3>
-          <p id="worst-hood" class="value small" style="color:var(--danger);">-</p>
-        </div>
-        <div class="card">
-          <h3>متوسط الثقة</h3>
-          <p id="avg-confidence" class="value small" style="color:var(--accent);">0%</p>
-        </div>
-        <div class="card">
-          <h3>تم رصدها اليوم</h3>
-          <p id="today-pins" class="value small">0</p>
-        </div>
-        <div class="card">
-          <h3>خلال آخر 7 أيام</h3>
-          <p id="week-pins" class="value small">0</p>
-        </div>
-        <div class="card">
-          <h3>نسبة التحقق</h3>
-          <p id="verified-rate" class="value small">0%</p>
-        </div>
-        <div class="card">
-          <h3>أقدم اكتشاف</h3>
-          <p id="oldest-pin-age" class="value small">-</p>
-        </div>
-        <div class="card">
-          <h3>أحدث اكتشاف</h3>
-          <p id="newest-pin-time" class="value small">-</p>
-        </div>
-        <div class="card">
-          <h3>متوسط عمر البلاغ</h3>
-          <p id="avg-age" class="value small">-</p>
-        </div>
-      </section>
-      
-      <section>
-         <canvas id="severityChart" height="180"></canvas>
-      </section>
+            <h3>تدخل عاجل</h3>
+            <p id="urgent-pins" class="value small value-danger">0</p>
+          </div>
+          <div class="card">
+            <h3>قيد المعالجة</h3>
+            <p id="in-progress-pins" class="value small value-accent">0</p>
+          </div>
+          <div class="card">
+            <h3>تم معالجتها</h3>
+            <p id="fixed-pins" class="value small">0</p>
+          </div>
+          <div class="card">
+            <h3>تم رصدها اليوم</h3>
+            <p id="today-pins" class="value small">0</p>
+          </div>
+          <div class="card">
+            <h3>خلال آخر 7 أيام</h3>
+            <p id="week-pins" class="value small">0</p>
+          </div>
+          <div class="card">
+            <h3>متوسط الاستجابة</h3>
+            <p id="avg-response-time" class="value small">48 ساعة</p>
+          </div>
+          <div class="card">
+            <h3>الأكثر تضرراً</h3>
+            <p id="worst-hood" class="value small value-danger">-</p>
+          </div>
+        </section>
 
-      <section class="mini-metrics">
-        <div class="mini-card">
-          <span>خفيف</span>
-          <strong id="low-severity-count">0</strong>
-        </div>
-        <div class="mini-card">
-          <span>متوسط</span>
-          <strong id="mid-severity-count">0</strong>
-        </div>
-        <div class="mini-card">
-          <span>عالي</span>
-          <strong id="high-severity-count">0</strong>
-        </div>
-      </section>
+        <section>
+           <canvas id="defectsChart" height="180"></canvas>
+        </section>
 
-      <section class="table-wrap">
+        <section class="table-wrap">
         <div class="table-head">
           <h3>سجل الاكتشافات</h3>
           <button id="clear-pins" type="button" class="danger-btn">مسح البيانات</button>
