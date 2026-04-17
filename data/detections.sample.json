@@ -1,0 +1,110 @@
+[
+  {
+    "detection_id": "154e0bcb",
+    "video_id": "run_001",
+    "frame_id": 171,
+    "video_timestamp_sec": 2.85,
+    "gps": {
+      "latitude": 26.2224174,
+      "longitude": 44.1354616
+    },
+    "confidence": 0.26,
+    "image_path": "runs/inference/run_001/frames/frame_0171.jpg"
+  },
+  {
+    "detection_id": "2411aabd",
+    "video_id": "run_001",
+    "frame_id": 241,
+    "video_timestamp_sec": 4.02,
+    "gps": {
+      "latitude": 26.222426,
+      "longitude": 44.135455
+    },
+    "confidence": 0.78,
+    "image_path": "runs/inference/run_001/frames/frame_0241.jpg"
+  },
+  {
+    "detection_id": "16fe7ce1",
+    "video_id": "run_001",
+    "frame_id": 241,
+    "video_timestamp_sec": 4.02,
+    "gps": {
+      "latitude": 26.222426,
+      "longitude": 44.135455
+    },
+    "confidence": 0.39,
+    "image_path": "runs/inference/run_001/frames/frame_0241.jpg"
+  },
+  {
+    "detection_id": "d6633edf",
+    "video_id": "run_001",
+    "frame_id": 251,
+    "video_timestamp_sec": 4.18,
+    "gps": {
+      "latitude": 26.2224313,
+      "longitude": 44.1354502
+    },
+    "confidence": 0.74,
+    "image_path": "runs/inference/run_001/frames/frame_0251.jpg"
+  },
+  {
+    "detection_id": "a23c02aa",
+    "video_id": "run_001",
+    "frame_id": 251,
+    "video_timestamp_sec": 4.18,
+    "gps": {
+      "latitude": 26.2224313,
+      "longitude": 44.1354502
+    },
+    "confidence": 0.64,
+    "image_path": "runs/inference/run_001/frames/frame_0251.jpg"
+  },
+  {
+    "detection_id": "06826fba",
+    "video_id": "run_001",
+    "frame_id": 261,
+    "video_timestamp_sec": 4.35,
+    "gps": {
+      "latitude": 26.2224404,
+      "longitude": 44.1354417
+    },
+    "confidence": 0.67,
+    "image_path": "runs/inference/run_001/frames/frame_0261.jpg"
+  },
+  {
+    "detection_id": "c7d0661b",
+    "video_id": "run_001",
+    "frame_id": 261,
+    "video_timestamp_sec": 4.35,
+    "gps": {
+      "latitude": 26.2224404,
+      "longitude": 44.1354417
+    },
+    "confidence": 0.51,
+    "image_path": "runs/inference/run_001/frames/frame_0261.jpg"
+  },
+  {
+    "detection_id": "f0bd1856",
+    "video_id": "run_001",
+    "frame_id": 261,
+    "video_timestamp_sec": 4.35,
+    "gps": {
+      "latitude": 26.2224404,
+      "longitude": 44.1354417
+    },
+    "confidence": 0.31,
+    "image_path": "runs/inference/run_001/frames/frame_0261.jpg"
+  },
+  {
+    "detection_id": "e26a0f02",
+    "video_id": "run_001",
+    "frame_id": 281,
+    "video_timestamp_sec": 4.68,
+    "gps": {
+      "latitude": 26.2224557,
+      "longitude": 44.1354277
+    },
+    "confidence": 0.35,
+    "image_path": "runs/inference/run_001/frames/frame_0281.jpg"
+  }
+]
