@@ -72,3 +72,14 @@ export interface FrameResponse {
   };
   detections: DetectionRecord[];
 }
+
+export interface AuthSessionUser {
+  username: string;
+  role: "admin";
+}
+
+declare module "express-session" {
+  interface SessionData {
+    adminUser?: AuthSessionUser;
+  }
+}

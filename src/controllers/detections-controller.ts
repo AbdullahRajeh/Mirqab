@@ -1,9 +1,13 @@
 import type { Request, Response } from "express";
 import type { DetectionServiceContract } from "../services/detection-service";
 import { validateFrameParams, validateListQuery } from "../validation/detections";
+import { validateDetectionIdParam } from "../validation/mock-workflow";
+import { validateReviewBody } from "../validation/reviews";
 
 export function createDetectionsController(service: DetectionServiceContract): {
   listVideos: (_req: Request, res: Response) => Promise<void>;
+  listReviews: (_req: Request, res: Response) => Promise<void>;
+  setReview: (req: Request, res: Response) => Promise<void>;
   listDetections: (req: Request, res: Response) => Promise<void>;
   stats: (req: Request, res: Response) => Promise<void>;
   map: (req: Request, res: Response) => Promise<void>;
@@ -13,6 +17,19 @@ export function createDetectionsController(service: DetectionServiceContract): {
     async listVideos(_req: Request, res: Response): Promise<void> {
       const items = await service.listVideos();
       res.json({ items });
+    },
+
+    async listReviews(_req: Request, res: Response): Promise<void> {
+      const items = await service.listReviews();
+      res.json({ items });
+    },
+
+    async setReview(req: Request, res: Response): Promise<void> {
+      const rawId = req.params.detectionId;
+      const detectionId = validateDetectionIdParam(typeof rawId === "string" ? rawId : rawId?.[0] ?? "");
+      const { decision } = validateReviewBody(req.body);
+      const payload = await service.setReview(detectionId, decision);
+      res.json(payload);
     },
 
     async listDetections(req: Request, res: Response): Promise<void> {

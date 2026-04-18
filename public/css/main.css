@@ -342,14 +342,15 @@ button:hover,
   flex-direction: column;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
-#severityChart {
+/* Chart canvas inside slide-over panel only — avoid global #severityChart (standalone /dashboard uses Chart.js + flex elsewhere). */
+.dashboard-panel > section:nth-of-type(2) canvas {
   width: 100% !important;
   height: 100% !important;
   flex: 1;
 }
 
-/* Table Area */
-.table-wrap {
+/* Table Area (slide-over panel grid only — standalone dashboard styles its own .table-wrap in dashboard.css) */
+.dashboard-panel .table-wrap {
   grid-area: table;
   width: 100%;
   max-width: 100%;
@@ -393,7 +394,7 @@ button:hover,
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
 }
 
-.table-scroll {
+.dashboard-panel .table-scroll {
   width: 100%;
   flex: 1;
   min-height: 0; /* Important for flex child to be scrollable */
@@ -407,19 +408,19 @@ button:hover,
 }
 
 /* Custom Scrollbar for the table */
-.table-scroll::-webkit-scrollbar {
+.dashboard-panel .table-scroll::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-.table-scroll::-webkit-scrollbar-track {
+.dashboard-panel .table-scroll::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 4px;
 }
-.table-scroll::-webkit-scrollbar-thumb {
+.dashboard-panel .table-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
-.table-scroll::-webkit-scrollbar-thumb:hover {
+.dashboard-panel .table-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
 
@@ -539,7 +540,7 @@ tbody tr:hover {
       'chart'
       'table';
   }
-  .table-wrap {
+  .dashboard-panel .table-wrap {
     min-height: 480px;
   }
 }
@@ -559,8 +560,7 @@ tbody tr:hover {
   .stats {
     grid-template-columns: repeat(4, 1fr);
   }
-
-  .card, .table-wrap {
+}
 
 @media (max-width: 600px) {
   .stats {

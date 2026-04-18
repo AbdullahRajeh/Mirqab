@@ -49,12 +49,15 @@ async function seed(): Promise<void> {
         VALUES (
           $1,
           $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          ST_SetSRID(ST_MakePoint($7, $6), 4326)::geography,
+          $3::integer,
+          $4::numeric,
+          $5::numeric,
+          $6::numeric,
+          $7::numeric,
+          ST_SetSRID(
+            ST_MakePoint($7::double precision, $6::double precision),
+            4326
+          )::geography,
           $8
         )
         ON CONFLICT (detection_id) DO UPDATE SET

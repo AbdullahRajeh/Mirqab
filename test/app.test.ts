@@ -11,8 +11,14 @@ import type {
   VideoSummary,
 } from "../src/types";
 import type { DetectionServiceContract } from "../src/services/detection-service";
+import { resetMockWorkflowStore } from "../src/services/mock-workflow-store";
+import { HttpError } from "../src/utils/http-error";
 
 class FakeService {
+  private readonly reviewStore = new Map<
+    string,
+    { decision: "approved" | "rejected"; updatedAtMs: number }
+  >();
   async listVideos(): Promise<VideoSummary[]> {
     return [
       {
@@ -89,6 +95,35 @@ class FakeService {
     };
   }
 
+  async listReviews(): Promise<
+    Array<{ detection_id: string; decision: "approved" | "rejected"; updatedAt: string }>
+  > {
+    return [...this.reviewStore.entries()]
+      .map(([detection_id, entry]) => ({
+        detection_id,
+        decision: entry.decision,
+        updatedAt: new Date(entry.updatedAtMs).toISOString(),
+      }))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async setReview(
+    detectionId: string,
+    decision: "approved" | "rejected",
+  ): Promise<{ detection_id: string; decision: "approved" | "rejected"; updatedAt: string }> {
+    const known = new Set(["2411aabd", "16fe7ce1"]);
+    if (!known.has(detectionId)) {
+      throw new HttpError(404, "detection_not_found", "Detection not found");
+    }
+    const updatedAtMs = Date.now();
+    this.reviewStore.set(detectionId, { decision, updatedAtMs });
+    return {
+      detection_id: detectionId,
+      decision,
+      updatedAt: new Date(updatedAtMs).toISOString(),
+    };
+  }
+
   async getFrame(videoId: string, frameId: number): Promise<FrameResponse> {
     if (videoId !== "run_001" || frameId !== 241) {
       const error = new Error("Frame not found") as Error & {
@@ -137,6 +172,16 @@ function createTestApp() {
   return createApp({ service: new FakeService() satisfies DetectionServiceContract });
 }
 
+async function loginAsAdmin(agent: ReturnType<typeof request.agent>): Promise<void> {
+  const response = await agent
+    .post("/auth/login")
+    .set("Content-Type", "application/json")
+    .send({ username: "admin", password: "admin123" });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.success, true);
+}
+
 test("GET /health returns ok", async () => {
   const app = createTestApp();
   const response = await request(app).get("/health");
@@ -144,9 +189,51 @@ test("GET /health returns ok", async () => {
   assert.deepEqual(response.body, { status: "ok" });
 });
 
-test("GET /api/v1/detections returns paginated items", async () => {
+test("GET /dashboard redirects to /login when unauthenticated", async () => {
+  const app = createTestApp();
+  const response = await request(app).get("/dashboard");
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(response.headers.location, "/login");
+});
+
+test("GET /api/v1/detections returns unauthorized without admin session", async () => {
+  const app = createTestApp();
+  const response = await request(app).get("/api/v1/detections");
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.code, "unauthorized");
+});
+
+test("POST /auth/login rejects invalid credentials", async () => {
   const app = createTestApp();
   const response = await request(app)
+    .post("/auth/login")
+    .set("Content-Type", "application/json")
+    .send({ username: "admin", password: "wrong" });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.code, "invalid_credentials");
+});
+
+test("POST /auth/logout invalidates session", async () => {
+  const app = createTestApp();
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const logoutResponse = await agent.post("/auth/logout");
+  assert.equal(logoutResponse.statusCode, 200);
+
+  const response = await agent.get("/api/v1/videos");
+  assert.equal(response.statusCode, 401);
+});
+
+test("GET /api/v1/detections returns paginated items", async () => {
+  const app = createTestApp();
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent
     .get("/api/v1/detections")
     .query({ videoId: "run_001", minConfidence: 0.3, limit: 10, offset: 0 });
 
@@ -159,7 +246,10 @@ test("GET /api/v1/detections returns paginated items", async () => {
 
 test("GET /api/v1/detections rejects invalid confidence filters", async () => {
   const app = createTestApp();
-  const response = await request(app)
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent
     .get("/api/v1/detections")
     .query({ minConfidence: 0.9, maxConfidence: 0.2 });
 
@@ -169,7 +259,10 @@ test("GET /api/v1/detections rejects invalid confidence filters", async () => {
 
 test("GET /api/v1/detections/stats returns summary cards", async () => {
   const app = createTestApp();
-  const response = await request(app).get("/api/v1/detections/stats");
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent.get("/api/v1/detections/stats");
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.unique_frames, 5);
@@ -178,7 +271,10 @@ test("GET /api/v1/detections/stats returns summary cards", async () => {
 
 test("GET /api/v1/detections/map returns ordered map groups", async () => {
   const app = createTestApp();
-  const response = await request(app).get("/api/v1/detections/map");
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent.get("/api/v1/detections/map");
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.videos[0].video_id, "run_001");
@@ -187,7 +283,10 @@ test("GET /api/v1/detections/map returns ordered map groups", async () => {
 
 test("GET /api/v1/frames/:videoId/:frameId returns grouped frame data", async () => {
   const app = createTestApp();
-  const response = await request(app).get("/api/v1/frames/run_001/241");
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent.get("/api/v1/frames/run_001/241");
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.frame_id, 241);
@@ -196,7 +295,10 @@ test("GET /api/v1/frames/:videoId/:frameId returns grouped frame data", async ()
 
 test("GET /api/v1/frames/:videoId/:frameId returns not found for empty frame", async () => {
   const app = createTestApp();
-  const response = await request(app).get("/api/v1/frames/run_001/999");
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent.get("/api/v1/frames/run_001/999");
 
   assert.equal(response.statusCode, 404);
   assert.equal(response.body.code, "frame_not_found");
@@ -204,8 +306,64 @@ test("GET /api/v1/frames/:videoId/:frameId returns not found for empty frame", a
 
 test("GET /api/v1/videos returns video summaries", async () => {
   const app = createTestApp();
-  const response = await request(app).get("/api/v1/videos");
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const response = await agent.get("/api/v1/videos");
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.items[0].video_id, "run_001");
+});
+
+test("mock workflow routes return 401 without admin session", async () => {
+  resetMockWorkflowStore();
+  const app = createTestApp();
+
+  const upload = await request(app).post("/api/v1/mock/videos/upload").send({ fileName: "a.mp4" });
+  assert.equal(upload.statusCode, 401);
+
+  const status = await request(app).get("/api/v1/mock/videos/upload/upl_x");
+  assert.equal(status.statusCode, 401);
+
+  const review = await request(app).patch("/api/v1/detections/abc/review").send({ decision: "approved" });
+  assert.equal(review.statusCode, 401);
+
+  const list = await request(app).get("/api/v1/detections/reviews");
+  assert.equal(list.statusCode, 401);
+});
+
+test("POST /api/v1/mock/videos/upload and GET status succeed when authenticated", async () => {
+  resetMockWorkflowStore();
+  const app = createTestApp();
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const created = await agent.post("/api/v1/mock/videos/upload").send({ fileName: "clip.mp4", sizeBytes: 4096 });
+  assert.equal(created.statusCode, 201);
+  assert.match(created.body.uploadId, /^upl_/);
+  assert.match(created.body.videoId, /^mock_vid_/);
+  assert.equal(created.body.status, "queued");
+
+  const uploadId = created.body.uploadId as string;
+  const polled = await agent.get(`/api/v1/mock/videos/upload/${uploadId}`);
+  assert.equal(polled.statusCode, 200);
+  assert.equal(polled.body.uploadId, uploadId);
+  assert.ok(polled.body.progress >= 0);
+});
+
+test("PATCH /api/v1/detections/:id/review and GET reviews succeed when authenticated", async () => {
+  resetMockWorkflowStore();
+  const app = createTestApp();
+  const agent = request.agent(app);
+  await loginAsAdmin(agent);
+
+  const patch = await agent.patch("/api/v1/detections/2411aabd/review").send({ decision: "rejected" });
+  assert.equal(patch.statusCode, 200);
+  assert.equal(patch.body.detection_id, "2411aabd");
+  assert.equal(patch.body.decision, "rejected");
+
+  const list = await agent.get("/api/v1/detections/reviews");
+  assert.equal(list.statusCode, 200);
+  assert.equal(list.body.items.length, 1);
+  assert.equal(list.body.items[0].detection_id, "2411aabd");
 });

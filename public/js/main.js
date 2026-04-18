@@ -197,6 +197,10 @@ async function fetchJson(url) {
     },
   });
 
+  if (response.status === 401) {
+    throw new Error("يلزم تسجيل دخول المشرف. انتقل إلى صفحة /login ثم أعد المحاولة.");
+  }
+
   if (!response.ok) {
     let details = response.statusText;
     try {

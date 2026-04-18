@@ -50,6 +50,12 @@ export type MapRow = {
   image_path: string;
 };
 
+export type ReviewRecord = {
+  detection_id: string;
+  decision: "approved" | "rejected";
+  reviewed_at: Date;
+};
+
 export interface DetectionRepositoryContract {
   listVideos(): Promise<VideoRow[]>;
   listDetections(filters: DetectionListQuery): Promise<{ rows: DetectionRow[]; total: number }>;
@@ -58,6 +64,11 @@ export interface DetectionRepositoryContract {
   ): Promise<{ summary: StatsSummaryRow | undefined; perVideo: PerVideoStatsRow[] }>;
   getMapData(filters: DetectionListQuery): Promise<MapRow[]>;
   getFrame(videoId: string, frameId: number): Promise<DetectionRow[]>;
+  listReviews(): Promise<ReviewRecord[]>;
+  setReview(
+    detectionId: string,
+    decision: "approved" | "rejected",
+  ): Promise<ReviewRecord | null>;
 }
 
 const SORT_COLUMN_MAP: Record<DetectionListQuery["sortBy"], string> = {
@@ -253,5 +264,59 @@ export class DetectionRepository implements DetectionRepositoryContract {
     );
 
     return result.rows;
+  }
+
+  async listReviews(): Promise<ReviewRecord[]> {
+    const result = await this.pool.query<{
+      detection_id: string;
+      decision: "approved" | "rejected";
+      reviewed_at: Date;
+    }>(
+      `
+        SELECT
+          d.detection_id,
+          d.review_status AS decision,
+          d.reviewed_at
+        FROM detections d
+        WHERE d.review_status IS NOT NULL
+        ORDER BY d.reviewed_at DESC NULLS LAST, d.detection_id ASC
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      detection_id: row.detection_id,
+      decision: row.decision,
+      reviewed_at: row.reviewed_at,
+    }));
+  }
+
+  async setReview(
+    detectionId: string,
+    decision: "approved" | "rejected",
+  ): Promise<ReviewRecord | null> {
+    const result = await this.pool.query<{
+      detection_id: string;
+      decision: "approved" | "rejected";
+      reviewed_at: Date;
+    }>(
+      `
+        UPDATE detections
+        SET review_status = $1, reviewed_at = NOW()
+        WHERE detection_id = $2
+        RETURNING detection_id, review_status AS decision, reviewed_at
+      `,
+      [decision, detectionId],
+    );
+
+    const [row] = result.rows;
+    if (!row) {
+      return null;
+    }
+
+    return {
+      detection_id: row.detection_id,
+      decision: row.decision,
+      reviewed_at: row.reviewed_at,
+    };
   }
 }

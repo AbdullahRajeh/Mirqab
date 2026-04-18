@@ -120,6 +120,38 @@ export class DetectionService {
     };
   }
 
+  private toReviewApiPayload(row: {
+    detection_id: string;
+    decision: "approved" | "rejected";
+    reviewed_at: Date | string;
+  }): { detection_id: string; decision: "approved" | "rejected"; updatedAt: string } {
+    const reviewedAt =
+      row.reviewed_at instanceof Date ? row.reviewed_at : new Date(row.reviewed_at);
+    return {
+      detection_id: row.detection_id,
+      decision: row.decision,
+      updatedAt: reviewedAt.toISOString(),
+    };
+  }
+
+  async listReviews(): Promise<
+    Array<{ detection_id: string; decision: "approved" | "rejected"; updatedAt: string }>
+  > {
+    const rows = await this.repository.listReviews();
+    return rows.map((row) => this.toReviewApiPayload(row));
+  }
+
+  async setReview(
+    detectionId: string,
+    decision: "approved" | "rejected",
+  ): Promise<{ detection_id: string; decision: "approved" | "rejected"; updatedAt: string }> {
+    const row = await this.repository.setReview(detectionId, decision);
+    if (!row) {
+      throw new HttpError(404, "detection_not_found", "Detection not found");
+    }
+    return this.toReviewApiPayload(row);
+  }
+
   async getFrame(videoId: string, frameId: number): Promise<FrameResponse> {
     const rows = await this.repository.getFrame(videoId, frameId);
 
@@ -145,5 +177,11 @@ export class DetectionService {
 
 export type DetectionServiceContract = Pick<
   DetectionService,
-  "listVideos" | "listDetections" | "getStats" | "getMapData" | "getFrame"
+  | "listVideos"
+  | "listDetections"
+  | "getStats"
+  | "getMapData"
+  | "getFrame"
+  | "listReviews"
+  | "setReview"
 >;

@@ -1,0 +1,167 @@
+body.auth-page {
+  overflow: auto;
+  min-height: 100dvh;
+}
+
+body.auth-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 212, 97, 0.2), transparent 35%),
+    radial-gradient(circle at 82% 84%, rgba(255, 255, 255, 0.09), transparent 32%);
+}
+
+.login-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(320px, 520px) minmax(220px, 320px);
+  justify-content: center;
+  align-content: center;
+  gap: 1.2rem;
+  padding: 2.4rem 1rem;
+}
+
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 24px;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(10, 10, 10, 0.92);
+  box-shadow: 0 35px 70px rgba(0, 0, 0, 0.45);
+  padding: 2rem;
+  display: grid;
+  gap: 0.9rem;
+  animation: float-in 0.6s cubic-bezier(0.21, 1, 0.3, 1);
+}
+
+.login-card h1 {
+  font-family: "Aref Ruqaa Ink", "Cairo", sans-serif;
+  font-size: 2.15rem;
+  letter-spacing: 0.02em;
+}
+
+.login-lead {
+  color: var(--text-muted);
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+.login-form {
+  margin-top: 0.35rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.login-form label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.login-form input {
+  width: 100%;
+  min-height: 45px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  outline: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.login-form input:focus {
+  border-color: rgba(255, 212, 97, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.login-form button {
+  margin-top: 0.4rem;
+  border: 1px solid #ffd461;
+  border-radius: 12px;
+  background: #ffd461;
+  color: #101010;
+  min-height: 47px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.login-form button[disabled] {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.auth-status {
+  min-height: 1.1rem;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.auth-status.error {
+  color: #ffc1b4;
+}
+
+.login-note {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  padding: 1.3rem 1rem;
+  background: rgba(9, 9, 9, 0.78);
+  display: grid;
+  align-content: center;
+  gap: 0.35rem;
+  animation: fade-up 0.8s ease;
+}
+
+.login-note__title {
+  font-family: "Aref Ruqaa Ink", "Cairo", sans-serif;
+  font-size: 1.6rem;
+  color: #ffd461;
+}
+
+.login-note__copy {
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 860px) {
+  .login-shell {
+    grid-template-columns: minmax(300px, 1fr);
+    align-content: start;
+    padding-top: 3.1rem;
+  }
+
+  .login-note {
+    order: -1;
+  }
+}

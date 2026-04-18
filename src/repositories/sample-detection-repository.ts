@@ -5,6 +5,7 @@ import type {
   DetectionRow,
   MapRow,
   PerVideoStatsRow,
+  ReviewRecord,
   StatsSummaryRow,
   VideoRow,
 } from "./detection-repository";
@@ -35,6 +36,7 @@ const SORTERS: Record<
 
 export class SampleDetectionRepository implements DetectionRepositoryContract {
   private readonly detections: SeedDetection[];
+  private readonly reviews = new Map<string, { decision: "approved" | "rejected"; reviewedAtMs: number }>();
 
   constructor(sampleDataPath: string) {
     const raw = fs.readFileSync(sampleDataPath, "utf8");
@@ -236,5 +238,31 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
       .filter((detection) => detection.video_id === videoId && detection.frame_id === frameId)
       .sort((left, right) => left.detection_id.localeCompare(right.detection_id))
       .map((detection) => this.toRow(detection));
+  }
+
+  async listReviews(): Promise<ReviewRecord[]> {
+    return [...this.reviews.entries()]
+      .map(([detection_id, entry]) => ({
+        detection_id,
+        decision: entry.decision,
+        reviewed_at: new Date(entry.reviewedAtMs),
+      }))
+      .sort((left, right) => right.reviewed_at.getTime() - left.reviewed_at.getTime());
+  }
+
+  async setReview(
+    detectionId: string,
+    decision: "approved" | "rejected",
+  ): Promise<ReviewRecord | null> {
+    if (!this.detections.some((d) => d.detection_id === detectionId)) {
+      return null;
+    }
+    const reviewedAtMs = Date.now();
+    this.reviews.set(detectionId, { decision, reviewedAtMs });
+    return {
+      detection_id: detectionId,
+      decision,
+      reviewed_at: new Date(reviewedAtMs),
+    };
   }
 }

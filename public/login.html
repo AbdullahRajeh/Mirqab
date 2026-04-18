@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>دخول المشرف | مرقب</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Aref+Ruqaa+Ink:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/login.css" />
+  </head>
+  <body class="auth-page">
+    <main class="login-shell" aria-labelledby="login-title">
+      <div class="login-card" role="region" aria-label="Admin login form">
+        <p class="eyebrow">وصول آمن</p>
+        <h1 id="login-title">بوابة المشرف</h1>
+        <p class="login-lead">أدخل بيانات الإدارة للوصول إلى لوحة التحليلات والواجهات المحمية.</p>
+
+        <form id="login-form" class="login-form" novalidate>
+          <label for="username">اسم المستخدم</label>
+          <input id="username" name="username" type="text" autocomplete="username" required />
+
+          <label for="password">كلمة المرور</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+
+          <button id="login-submit" type="submit">تسجيل الدخول</button>
+          <p id="auth-status" class="auth-status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <aside class="login-note" aria-hidden="true">
+        <p class="login-note__title">مرقاب</p>
+        <p class="login-note__copy">نظام تحكم مخصص للعرض الإداري ومراقبة جودة الطرق.</p>
+      </aside>
+    </main>
+
+    <script type="module" src="/js/auth.js"></script>
+  </body>
+</html>

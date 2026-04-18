@@ -1,2 +1,4 @@
 node_modules/
-.env
+
+# Copied inference frames (large); keep local only
+media/
