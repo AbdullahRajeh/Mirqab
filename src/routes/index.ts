@@ -6,6 +6,7 @@ export function createRouter({
   detectionsController,
   authController,
   mockWorkflowController,
+  pipelineWorkflowController,
 }: {
   healthController: { health: express.RequestHandler };
   authController: {
@@ -23,6 +24,11 @@ export function createRouter({
     frame: express.RequestHandler;
   };
   mockWorkflowController: {
+    uploadVideo: express.RequestHandler;
+    getUploadStatus: express.RequestHandler;
+  };
+  pipelineWorkflowController: {
+    uploadMiddleware: (fieldName: string) => express.RequestHandler;
     uploadVideo: express.RequestHandler;
     getUploadStatus: express.RequestHandler;
   };
@@ -45,6 +51,13 @@ export function createRouter({
 
   router.post("/api/v1/mock/videos/upload", mockWorkflowController.uploadVideo);
   router.get("/api/v1/mock/videos/upload/:uploadId", mockWorkflowController.getUploadStatus);
+
+  router.post(
+    "/api/v1/pipeline/upload",
+    pipelineWorkflowController.uploadMiddleware("video"),
+    pipelineWorkflowController.uploadVideo,
+  );
+  router.get("/api/v1/pipeline/upload/:uploadId", pipelineWorkflowController.getUploadStatus);
 
   return router;
 }

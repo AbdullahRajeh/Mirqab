@@ -15,10 +15,7 @@ type SeedDetection = {
   video_id: string;
   frame_id: number;
   video_timestamp_sec: number;
-  gps: {
-    latitude: number;
-    longitude: number;
-  };
+  gps: { latitude: number; longitude: number } | null;
   confidence: number;
   image_path: string;
 };
@@ -102,8 +99,8 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
       frame_id: detection.frame_id,
       video_timestamp_sec: detection.video_timestamp_sec,
       confidence: detection.confidence,
-      latitude: detection.gps.latitude,
-      longitude: detection.gps.longitude,
+      latitude: detection.gps?.latitude ?? 0,
+      longitude: detection.gps?.longitude ?? 0,
       image_path: detection.image_path,
     };
   }
@@ -196,6 +193,8 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
     const grouped = new Map<string, SeedDetection[]>();
 
     for (const detection of filtered) {
+      // Skip detections with no GPS — they have no map pin
+      if (!detection.gps) continue;
       const key = [
         detection.video_id,
         detection.frame_id,
@@ -215,8 +214,8 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
           video_id: first.video_id,
           frame_id: first.frame_id,
           video_timestamp_sec: first.video_timestamp_sec,
-          latitude: first.gps.latitude,
-          longitude: first.gps.longitude,
+          latitude: first.gps!.latitude,
+          longitude: first.gps!.longitude,
           detection_count: items.length,
           max_confidence: Math.max(...items.map((item) => item.confidence)),
           image_path: [...items]

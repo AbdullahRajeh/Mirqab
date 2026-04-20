@@ -98,14 +98,23 @@
           </div>
 
           <div class="dashboard-tools-group dashboard-tools-group--upload">
-            <h3 class="dashboard-tools-subtitle">رفع فيديو (وهمي)</h3>
-            <p class="dashboard-tools-shortnote">
-              لا يُخزّن الملف؛ للتجربة فقط. المراجعات تُفقد عند إعادة تشغيل الخادم.
-            </p>
+            <h3 class="dashboard-tools-subtitle">رفع فيديو</h3>
             <input id="upload-input" type="file" accept="video/*" class="visually-hidden" />
             <div class="dashboard-upload-row">
               <button id="upload-trigger" type="button" class="action-secondary">اختيار ملف فيديو</button>
               <span id="upload-filename" class="dashboard-upload-filename">لم يُختر ملف</span>
+            </div>
+            <div class="dashboard-upload-row" style="align-items:center;gap:0.5rem;margin-top:0.5rem;">
+              <label for="skip-frames-input" style="font-size:0.85rem;white-space:nowrap;">تخطي الإطارات:</label>
+              <input
+                id="skip-frames-input"
+                type="number"
+                min="1"
+                max="120"
+                value="10"
+                style="width:4.5rem;padding:0.25rem 0.4rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:0.85rem;"
+              />
+              <span style="font-size:0.75rem;color:var(--text-muted,#888);">كلما زاد، زادت السرعة وقلّت الدقة</span>
             </div>
             <div id="upload-progress-wrap" class="dashboard-upload-progress-wrap" hidden>
               <div class="dashboard-upload-progress-track">

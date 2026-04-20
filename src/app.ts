@@ -5,6 +5,7 @@ import { config } from "./config";
 import { createAuthController } from "./controllers/auth-controller";
 import { createDetectionsController } from "./controllers/detections-controller";
 import { createHealthController } from "./controllers/health-controller";
+import { createPipelineWorkflowController } from "./controllers/pipeline-workflow-controller";
 import { getPool } from "./db/pool";
 import { redirectAuthedAdmin, requireAdminPage } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
@@ -12,10 +13,12 @@ import {
   DetectionRepository,
   type DetectionRepositoryContract,
 } from "./repositories/detection-repository";
+import { DynamicDetectionRepository } from "./repositories/dynamic-detection-repository";
 import { SampleDetectionRepository } from "./repositories/sample-detection-repository";
 import { createMockWorkflowController } from "./controllers/mock-workflow-controller";
 import { createRouter } from "./routes";
 import { getMockWorkflowStore } from "./services/mock-workflow-store";
+import { getPipelineWorkflowStore } from "./services/pipeline-workflow-store";
 import { DetectionService } from "./services/detection-service";
 import type { DetectionServiceContract } from "./services/detection-service";
 
@@ -25,24 +28,40 @@ type AppOverrides = {
   pool?: ReturnType<typeof getPool>;
 };
 
-function buildDependencies(overrides: AppOverrides = {}): { service: DetectionServiceContract } {
+function buildDependencies(overrides: AppOverrides = {}): {
+  service: DetectionServiceContract;
+  dynamicRepo: DynamicDetectionRepository | null;
+} {
   if (overrides.service) {
-    return { service: overrides.service };
+    return { service: overrides.service, dynamicRepo: null };
   }
 
-  const repository =
-    overrides.repository ??
-    (config.databaseUrl
-      ? new DetectionRepository(overrides.pool ?? getPool())
-      : new SampleDetectionRepository(config.sampleDataPath));
-  const service = new DetectionService(repository, config.mediaBaseUrl);
-  return { service };
+  if (overrides.repository) {
+    const service = new DetectionService(overrides.repository, config.mediaBaseUrl);
+    return { service, dynamicRepo: null };
+  }
+
+  if (config.databaseUrl) {
+    const repository = new DetectionRepository(overrides.pool ?? getPool());
+    const service = new DetectionService(repository, config.mediaBaseUrl);
+    return { service, dynamicRepo: null };
+  }
+
+  const inner = new SampleDetectionRepository(config.sampleDataPath);
+  const dynamicRepo = new DynamicDetectionRepository(inner);
+  const service = new DetectionService(dynamicRepo, config.mediaBaseUrl);
+  return { service, dynamicRepo };
 }
 
 export function createApp(overrides: AppOverrides = {}): express.Express {
-  const { service } = buildDependencies(overrides);
+  const { service, dynamicRepo } = buildDependencies(overrides);
   const detectionsController = createDetectionsController(service);
   const mockWorkflowController = createMockWorkflowController(getMockWorkflowStore());
+  const pipelineWorkflowController = createPipelineWorkflowController(
+    getPipelineWorkflowStore(process.cwd()),
+    dynamicRepo,
+    config.mediaBaseUrl,
+  );
   const healthController = createHealthController();
   const authController = createAuthController({
     adminUsername: config.adminUsername,
@@ -72,6 +91,7 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
       detectionsController,
       authController,
       mockWorkflowController,
+      pipelineWorkflowController,
     }),
   );
   app.use(

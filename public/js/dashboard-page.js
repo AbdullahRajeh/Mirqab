@@ -4,10 +4,10 @@ const FALLBACK_IMAGE =
 const STATS_ENDPOINT = "/api/v1/detections/stats";
 const VIDEOS_ENDPOINT = "/api/v1/videos";
 const REVIEWS_ENDPOINT = "/api/v1/detections/reviews";
-const MOCK_UPLOAD = "/api/v1/mock/videos/upload";
+const PIPELINE_UPLOAD = "/api/v1/pipeline/upload";
 
-function mockUploadStatusUrl(uploadId) {
-  return `/api/v1/mock/videos/upload/${encodeURIComponent(uploadId)}`;
+function pipelineUploadStatusUrl(uploadId) {
+  return `/api/v1/pipeline/upload/${encodeURIComponent(uploadId)}`;
 }
 
 function detectionReviewUrl(detectionId) {
@@ -185,7 +185,12 @@ function bindUi() {
     if (uploadFilename) {
       uploadFilename.textContent = file.name;
     }
-    void runMockUpload(file);
+    const skipFramesEl = document.getElementById("skip-frames-input");
+    const skipFrames =
+      skipFramesEl instanceof HTMLInputElement
+        ? Math.max(1, Math.min(120, Number.parseInt(skipFramesEl.value, 10) || 10))
+        : 10;
+    void runPipelineUpload(file, skipFrames);
     input.value = "";
   });
 
@@ -333,27 +338,57 @@ function fillVideoFilter(items) {
   }
 }
 
-async function runMockUpload(file) {
+const STATUS_LABELS = {
+  queued: "في الانتظار...",
+  inference: "تحليل الفيديو...",
+  gps: "استخراج إحداثيات GPS...",
+  complete: "اكتملت المعالجة",
+  failed: "فشلت المعالجة",
+};
+
+function xhrUpload(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    });
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch { reject(new Error("Invalid JSON response")); }
+      } else {
+        let msg = `Upload failed (${xhr.status})`;
+        try { msg = JSON.parse(xhr.responseText).message ?? msg; } catch {}
+        reject(new Error(msg));
+      }
+    });
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+    xhr.send(formData);
+  });
+}
+
+async function runPipelineUpload(file, skipFrames = 10) {
   if (uploadProgressWrap) {
     uploadProgressWrap.hidden = false;
   }
-  setUploadProgress(0, "جاري الإرسال...");
+  setUploadProgress(0, "جاري رفع الفيديو...");
   try {
-    const created = await fetchJson(MOCK_UPLOAD, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
+    const formData = new FormData();
+    formData.append("video", file);
+    formData.append("skipFrames", String(skipFrames));
+    // XHR so we get real upload progress events
+    const created = await xhrUpload(PIPELINE_UPLOAD, formData, (ratio) => {
+      setUploadProgress(Math.round(ratio * 25), `جاري رفع الفيديو... ${Math.round(ratio * 100)}%`);
     });
     const uploadId = created.uploadId;
-    setUploadProgress(created.progress ?? 0, created.status ?? "queued");
-    await pollUploadUntilDone(uploadId);
-    setMessage(
-      `تم قبول الرفع الوهمي. معرّف الفيديو المقترح: ${created.video_id ?? ""} (${file.name})`,
-      false,
-    );
+    setUploadProgress(created.progress ?? 0, STATUS_LABELS[created.status] ?? created.status);
+    await pollPipelineUntilDone(uploadId);
+    setMessage(`اكتملت المعالجة (${file.name}). جارٍ تحديث البيانات...`, false);
+    await loadAll({ resetSelection: true });
   } catch (error) {
     console.error(error);
-    setMessage(error instanceof Error ? error.message : "تعذر إكمال الرفع الوهمي.", true);
+    setMessage(error instanceof Error ? error.message : "تعذر إكمال معالجة الفيديو.", true);
   } finally {
     if (uploadProgressWrap) {
       uploadProgressWrap.hidden = true;
@@ -377,16 +412,21 @@ function sleep(ms) {
   });
 }
 
-async function pollUploadUntilDone(uploadId) {
-  for (let tick = 0; tick < 40; tick += 1) {
-    const status = await fetchJson(mockUploadStatusUrl(uploadId));
-    setUploadProgress(status.progress ?? 0, `${status.status} — ${status.progress ?? 0}%`);
-    if (status.status === "complete" || (status.progress ?? 0) >= 100) {
+async function pollPipelineUntilDone(uploadId) {
+  // Pipeline can take several minutes; poll every 3 seconds for up to 30 min
+  for (let tick = 0; tick < 600; tick += 1) {
+    const status = await fetchJson(pipelineUploadStatusUrl(uploadId));
+    const label = STATUS_LABELS[status.status] ?? status.status;
+    setUploadProgress(status.progress ?? 0, `${label} — ${status.progress ?? 0}%`);
+    if (status.status === "complete") {
       return;
     }
-    await sleep(280);
+    if (status.status === "failed") {
+      throw new Error(status.error ?? "فشلت المعالجة.");
+    }
+    await sleep(3000);
   }
-  throw new Error("انتهت مهلة انتظار الرفع الوهمي.");
+  throw new Error("انتهت مهلة انتظار المعالجة.");
 }
 
 async function submitReview(decision) {
