@@ -1,0 +1,28 @@
+# ============================================================
+# pothole_dataset.yaml
+# ============================================================
+# YOLO dataset configuration for the MWPD (Multi-Weather
+# Pothole Detection) dataset.
+#
+# This file tells YOLO where your images/labels are and
+# what classes to detect. We only have 1 class: "pothole".
+#
+# The 'path' field gets auto-updated by the training script
+# after the dataset is downloaded, so you don't need to
+# change it manually.
+# ============================================================
+
+# Root path to the dataset (auto-updated by train.py)
+path: ./data/MWPD
+
+# Relative paths to image folders (from 'path' above)
+train: train/images
+val: valid/images
+test: test/images
+
+# Number of classes
+nc: 1
+
+# Class names (index 0 = pothole)
+names:
+  0: pothole

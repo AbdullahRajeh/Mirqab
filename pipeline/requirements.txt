@@ -1,0 +1,28 @@
+# ============================================================
+# Pothole Detection Pipeline - Dependencies
+# ============================================================
+# Tested with Python 3.10+ and CUDA 12.x on RTX 3060 (12GB)
+# ============================================================
+
+# Core YOLO framework (includes PyTorch, OpenCV, etc.)
+ultralytics>=8.3.0
+
+# GPS extraction from drone OSD overlay
+easyocr>=1.7.0
+
+# Kaggle API for dataset download
+kaggle>=1.6.0
+
+# Image processing & augmentation
+Pillow>=10.0.0
+albumentations>=1.4.0
+
+# Data handling
+numpy>=1.24.0
+pyyaml>=6.0
+
+# Progress bars & logging
+tqdm>=4.65.0
+
+# Optional: TensorBoard for training visualization
+tensorboard>=2.14.0
