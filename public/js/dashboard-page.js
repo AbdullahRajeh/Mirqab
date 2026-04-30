@@ -61,7 +61,9 @@ const uploadProgressBar = document.getElementById("upload-progress-bar");
 const uploadStatusText = document.getElementById("upload-status-text");
 
 const reviewImage = document.getElementById("review-image");
+const reviewImageTrigger = document.getElementById("review-image-trigger");
 const reviewEmpty = document.getElementById("review-empty");
+const reviewZoomHint = document.getElementById("review-zoom-hint");
 const reviewMeta = document.getElementById("review-meta");
 const reviewQueueHint = document.getElementById("review-queue-hint");
 const btnReviewPrev = document.getElementById("btn-review-prev");
@@ -69,6 +71,15 @@ const btnReviewNext = document.getElementById("btn-review-next");
 const btnApprove = document.getElementById("btn-approve");
 const btnReject = document.getElementById("btn-reject");
 const mapLink = document.getElementById("map-link");
+const imageViewer = document.getElementById("image-viewer");
+const imageViewerBackdrop = document.getElementById("image-viewer-backdrop");
+const imageViewerImage = document.getElementById("image-viewer-image");
+const imageViewerStage = document.getElementById("image-viewer-stage");
+const imageViewerZoomValue = document.getElementById("image-viewer-zoom-value");
+const imageViewerZoomIn = document.getElementById("image-viewer-zoom-in");
+const imageViewerZoomOut = document.getElementById("image-viewer-zoom-out");
+const imageViewerReset = document.getElementById("image-viewer-reset");
+const imageViewerClose = document.getElementById("image-viewer-close");
 
 const state = {
   detections: [],
@@ -84,6 +95,7 @@ const state = {
   compact: false,
   chart: null,
   activeDetectionId: null,
+  imageViewerZoom: 1,
 };
 
 boot().catch((error) => {
@@ -210,6 +222,33 @@ function bindUi() {
     void submitReview("rejected");
   });
 
+  reviewImageTrigger?.addEventListener("click", () => {
+    openImageViewer();
+  });
+
+  imageViewerBackdrop?.addEventListener("click", closeImageViewer);
+  imageViewerClose?.addEventListener("click", closeImageViewer);
+  imageViewerZoomIn?.addEventListener("click", () => {
+    setImageViewerZoom(state.imageViewerZoom + 0.25);
+  });
+  imageViewerZoomOut?.addEventListener("click", () => {
+    setImageViewerZoom(state.imageViewerZoom - 0.25);
+  });
+  imageViewerReset?.addEventListener("click", () => {
+    setImageViewerZoom(1);
+  });
+  imageViewerStage?.addEventListener(
+    "wheel",
+    (event) => {
+      if (!(imageViewer?.hidden ?? true)) {
+        event.preventDefault();
+        const delta = event.deltaY < 0 ? 0.2 : -0.2;
+        setImageViewerZoom(state.imageViewerZoom + delta);
+      }
+    },
+    { passive: false },
+  );
+
   pinsBody?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) {
@@ -242,6 +281,9 @@ function bindUi() {
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       navigateQueue(-1);
+    } else if (event.key === "Escape" && !(imageViewer?.hidden ?? true)) {
+      event.preventDefault();
+      closeImageViewer();
     }
   });
 }
@@ -588,9 +630,14 @@ function renderReviewPanel() {
 
   const detection = state.detections.find((d) => d.id === state.activeDetectionId) ?? null;
   if (!detection) {
+    if (reviewImageTrigger instanceof HTMLButtonElement) {
+      reviewImageTrigger.hidden = true;
+    }
     if (reviewImage instanceof HTMLImageElement) {
-      reviewImage.hidden = true;
       reviewImage.removeAttribute("src");
+    }
+    if (reviewZoomHint) {
+      reviewZoomHint.hidden = true;
     }
     if (reviewEmpty) {
       reviewEmpty.hidden = false;
@@ -613,14 +660,19 @@ function renderReviewPanel() {
   if (reviewEmpty) {
     reviewEmpty.hidden = true;
   }
+  if (reviewImageTrigger instanceof HTMLButtonElement) {
+    reviewImageTrigger.hidden = false;
+  }
   if (reviewImage instanceof HTMLImageElement) {
-    reviewImage.hidden = false;
     reviewImage.src = detection.imageUrl;
     reviewImage.alt = `إطار ${detection.frameId}`;
     reviewImage.onerror = () => {
       reviewImage.onerror = null;
       reviewImage.src = FALLBACK_IMAGE;
     };
+  }
+  if (reviewZoomHint) {
+    reviewZoomHint.hidden = false;
   }
 
   const reviewed = state.reviews.has(detection.id);
@@ -646,6 +698,55 @@ function renderReviewPanel() {
   if (mapLink instanceof HTMLAnchorElement) {
     mapLink.hidden = false;
     mapLink.href = `/?focus=${encodeURIComponent(detection.pointId)}`;
+  }
+}
+
+function openImageViewer() {
+  const detection = state.detections.find((d) => d.id === state.activeDetectionId) ?? null;
+  if (!detection || !(imageViewer instanceof HTMLElement) || !(imageViewerImage instanceof HTMLImageElement)) {
+    return;
+  }
+
+  imageViewer.hidden = false;
+  document.body.classList.add("dashboard-image-viewer-open");
+  imageViewerImage.src = detection.imageUrl;
+  imageViewerImage.alt = `إطار ${detection.frameId}`;
+  imageViewerImage.onerror = () => {
+    imageViewerImage.onerror = null;
+    imageViewerImage.src = FALLBACK_IMAGE;
+  };
+  setImageViewerZoom(1);
+  imageViewerClose instanceof HTMLButtonElement && imageViewerClose.focus();
+}
+
+function closeImageViewer() {
+  if (!(imageViewer instanceof HTMLElement) || !(imageViewerImage instanceof HTMLImageElement)) {
+    return;
+  }
+  imageViewer.hidden = true;
+  document.body.classList.remove("dashboard-image-viewer-open");
+  imageViewerImage.removeAttribute("src");
+  if (imageViewerStage instanceof HTMLElement) {
+    imageViewerStage.scrollTop = 0;
+    imageViewerStage.scrollLeft = 0;
+  }
+}
+
+function setImageViewerZoom(value) {
+  const nextZoom = Math.max(1, Math.min(4, Math.round(value * 100) / 100));
+  state.imageViewerZoom = nextZoom;
+
+  if (imageViewerImage instanceof HTMLImageElement) {
+    imageViewerImage.style.width = `${nextZoom * 100}%`;
+  }
+  if (imageViewerZoomValue) {
+    imageViewerZoomValue.textContent = `${Math.round(nextZoom * 100)}%`;
+  }
+  if (imageViewerZoomIn instanceof HTMLButtonElement) {
+    imageViewerZoomIn.disabled = nextZoom >= 4;
+  }
+  if (imageViewerZoomOut instanceof HTMLButtonElement) {
+    imageViewerZoomOut.disabled = nextZoom <= 1;
   }
 }
 

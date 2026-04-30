@@ -174,15 +174,23 @@
           <p id="review-queue-hint" class="dashboard-review-hint"></p>
           <div class="dashboard-review-body">
             <div class="dashboard-review-preview">
+              <button
+                id="review-image-trigger"
+                class="dashboard-review-image-trigger"
+                type="button"
+                aria-label="فتح صورة الإطار للتكبير"
+                hidden
+              >
               <img
                 id="review-image"
                 class="dashboard-review-image"
                 src=""
                 alt="معاينة الإطار"
-                hidden
               />
+              </button>
               <div id="review-empty" class="dashboard-review-empty">اختر صفاً من الجدول.</div>
             </div>
+            <p id="review-zoom-hint" class="dashboard-review-zoom-hint" hidden>اضغط الصورة لفتحها والتكبير قبل اعتمادها.</p>
             <dl id="review-meta" class="dashboard-review-meta"></dl>
             <div class="dashboard-review-actions">
               <button id="btn-review-prev" type="button" class="action-secondary">معلّق سابق</button>
@@ -195,6 +203,25 @@
         </aside>
       </div>
     </main>
+
+    <div id="image-viewer" class="dashboard-image-viewer" hidden>
+      <div id="image-viewer-backdrop" class="dashboard-image-viewer__backdrop"></div>
+      <div class="dashboard-image-viewer__dialog" role="dialog" aria-modal="true" aria-labelledby="image-viewer-title">
+        <div class="dashboard-image-viewer__toolbar">
+          <strong id="image-viewer-title" class="dashboard-image-viewer__title">معاينة الإطار</strong>
+          <div class="dashboard-image-viewer__controls">
+            <button id="image-viewer-zoom-out" type="button" class="action-secondary" aria-label="تصغير">-</button>
+            <span id="image-viewer-zoom-value" class="dashboard-image-viewer__zoom-value">100%</span>
+            <button id="image-viewer-zoom-in" type="button" class="action-secondary" aria-label="تكبير">+</button>
+            <button id="image-viewer-reset" type="button" class="action-secondary">إعادة الضبط</button>
+            <button id="image-viewer-close" type="button" class="action-secondary">إغلاق</button>
+          </div>
+        </div>
+        <div id="image-viewer-stage" class="dashboard-image-viewer__stage">
+          <img id="image-viewer-image" class="dashboard-image-viewer__image" src="" alt="معاينة مكبرة للإطار" />
+        </div>
+      </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="/js/dashboard-page.js"></script>
