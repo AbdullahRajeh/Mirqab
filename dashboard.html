@@ -3,65 +3,228 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>لوحة التحليلات</title>
+    <title>لوحة تحليلات العيوب</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
-    <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;700;800&family=Changa:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/css/main.css" />
     <link rel="stylesheet" href="/css/dashboard.css" />
   </head>
   <body>
     <main class="dashboard-page">
       <header class="dashboard-page-head">
-        <div>
+        <div class="dashboard-page-brand">
           <p class="eyebrow">التحليل المكاني</p>
-          <h1>سلامة البنية التحتية</h1>
+          <h1>تحليلات اكتشاف العيوب</h1>
         </div>
-        <a href="/" class="close-btn" aria-label="Back to map">عودة</a>
+        <div class="dashboard-page-toolbar" role="toolbar" aria-label="إجراءات اللوحة">
+          <button id="logout-button" type="button" class="danger-btn">تسجيل الخروج</button>
+          <a href="/" class="dashboard-back-btn" aria-label="العودة إلى الخريطة">عودة للخريطة</a>
+        </div>
       </header>
 
-      <section class="stats">
-        <div class="card">
-          <h3>إجمالي العيوب</h3>
-          <p id="total-pins" class="value">0</p>
+      <p id="message" class="dashboard-page-message message" aria-live="polite"></p>
+
+      <section class="dashboard-kpis" aria-label="ملخص الأرقام">
+        <div class="dashboard-kpi">
+          <span class="dashboard-kpi-label">إجمالي العيوب</span>
+          <span id="total-pins" class="dashboard-kpi-value">0</span>
         </div>
-        <div class="card">
-          <h3>الأكثر تضرراً</h3>
-          <p id="worst-hood" class="value small" style="color:var(--danger);">-</p>
+        <span class="dashboard-kpi-divider" aria-hidden="true"></span>
+        <div class="dashboard-kpi">
+          <span class="dashboard-kpi-label">أكثر فيديو اكتشافاً</span>
+          <span id="worst-hood" class="dashboard-kpi-value dashboard-kpi-value--warn">-</span>
         </div>
-        <div class="card">
-          <h3>متوسط الثقة</h3>
-          <p id="avg-confidence" class="value small" style="color:var(--accent);">0%</p>
+        <span class="dashboard-kpi-divider" aria-hidden="true"></span>
+        <div class="dashboard-kpi">
+          <span class="dashboard-kpi-label">متوسط الثقة</span>
+          <span id="avg-confidence" class="dashboard-kpi-value dashboard-kpi-value--accent">0%</span>
         </div>
       </section>
 
-      <section class="dashboard-chart">
-        <canvas id="severityChart" height="180"></canvas>
+      <section class="dashboard-tools" aria-labelledby="tools-heading">
+        <div class="dashboard-tools-head">
+          <h2 id="tools-heading" class="dashboard-section-title">فلترة الجدول والرفع التجريبي</h2>
+          <button id="btn-refresh" type="button" class="action-secondary dashboard-tools-refresh">تحديث البيانات</button>
+        </div>
+
+        <div class="dashboard-tools-body">
+          <div class="dashboard-tools-group">
+            <h3 class="dashboard-tools-subtitle">عرض الجدول</h3>
+            <div class="dashboard-inline-controls" role="group" aria-label="فلترة وترتيب">
+              <div class="dashboard-control">
+                <label for="video-filter">الفيديو</label>
+                <select id="video-filter" class="dashboard-select">
+                  <option value="">الكل</option>
+                </select>
+              </div>
+              <div class="dashboard-control">
+                <label for="page-size">عدد الصفوف</label>
+                <select id="page-size" class="dashboard-select">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="200" selected>200</option>
+                  <option value="500">500</option>
+                </select>
+              </div>
+              <div class="dashboard-control">
+                <label for="sort-by">ترتيب حسب</label>
+                <select id="sort-by" class="dashboard-select">
+                  <option value="timestampSec">الوقت في الفيديو</option>
+                  <option value="confidence">الثقة</option>
+                  <option value="frameId">رقم الإطار</option>
+                  <option value="videoId">الفيديو</option>
+                  <option value="detectionId">الاكتشاف</option>
+                </select>
+              </div>
+              <div class="dashboard-control">
+                <label for="sort-order">الاتجاه</label>
+                <select id="sort-order" class="dashboard-select">
+                  <option value="desc">تنازلي</option>
+                  <option value="asc">تصاعدي</option>
+                </select>
+              </div>
+              <div class="dashboard-control">
+                <label for="compact-toggle">عرض مضغوط</label>
+                <div class="dashboard-control-toggle">
+                  <input id="compact-toggle" type="checkbox" />
+                  <span class="dashboard-toggle-hint">تصغير ارتفاع الصفوف</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-tools-group dashboard-tools-group--upload">
+            <h3 class="dashboard-tools-subtitle">رفع فيديو</h3>
+            <input id="upload-input" type="file" accept="video/*" class="visually-hidden" />
+            <div class="dashboard-upload-row">
+              <button id="upload-trigger" type="button" class="action-secondary">اختيار ملف فيديو</button>
+              <span id="upload-filename" class="dashboard-upload-filename">لم يُختر ملف</span>
+            </div>
+            <div class="dashboard-upload-row" style="align-items:center;gap:0.5rem;margin-top:0.5rem;">
+              <label for="skip-frames-input" style="font-size:0.85rem;white-space:nowrap;">تخطي الإطارات:</label>
+              <input
+                id="skip-frames-input"
+                type="number"
+                min="1"
+                max="120"
+                value="10"
+                style="width:4.5rem;padding:0.25rem 0.4rem;border:1px solid var(--border,#ccc);border-radius:4px;font-size:0.85rem;"
+              />
+              <span style="font-size:0.75rem;color:var(--text-muted,#888);">كلما زاد، زادت السرعة وقلّت الدقة</span>
+            </div>
+            <div id="upload-progress-wrap" class="dashboard-upload-progress-wrap" hidden>
+              <div class="dashboard-upload-progress-track">
+                <div id="upload-progress-bar" class="dashboard-upload-progress-bar"></div>
+              </div>
+              <span id="upload-status-text" class="dashboard-upload-status"></span>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section class="table-wrap">
-        <div class="table-head">
-          <h3>سجل الاكتشافات</h3>
-          <button id="clear-pins" type="button" class="danger-btn">مسح البيانات</button>
+      <div class="dashboard-work">
+        <div class="dashboard-work-primary dashboard-data-surface">
+          <section class="dashboard-chart" aria-labelledby="chart-title">
+            <div class="dashboard-chart-head">
+              <h2 id="chart-title">توزيع الاكتشافات حسب الفيديو</h2>
+              <span class="dashboard-chart-sub">أعلى ستة مصادر</span>
+            </div>
+            <div class="dashboard-chart-canvas" role="presentation">
+              <canvas id="severityChart" height="180"></canvas>
+            </div>
+          </section>
+
+          <section class="dashboard-table-section" aria-labelledby="table-title">
+            <div class="table-wrap">
+              <div class="table-head">
+                <h3 id="table-title" class="dashboard-table-title">سجل الاكتشافات</h3>
+                <div class="dashboard-pagination" role="navigation" aria-label="ترقيم الصفحات">
+                  <span id="page-info" class="dashboard-page-info"></span>
+                  <button id="btn-prev-page" type="button" class="action-secondary">السابق</button>
+                  <button id="btn-next-page" type="button" class="action-secondary">التالي</button>
+                </div>
+              </div>
+              <p class="dashboard-table-hint">اضغط صفاً لعرضه في لوحة المراجعة. أزرار السابق/التالي تنتقل بين العناصر «المعلّقة» فقط.</p>
+              <div id="table-scroll" class="table-scroll">
+                <table id="pins-table">
+                  <thead>
+                    <tr>
+                      <th>الصورة</th>
+                      <th>الفيديو</th>
+                      <th>الإطار</th>
+                      <th>الوقت</th>
+                      <th>الثقة</th>
+                      <th>المراجعة</th>
+                      <th>خريطة</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pins-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>الصورة</th>
-                <th>الحي</th>
-                <th>الثقة</th>
-                <th>الإجراء</th>
-              </tr>
-            </thead>
-            <tbody id="pins-body"></tbody>
-          </table>
-        </div>
-      </section>
+
+        <aside class="dashboard-work-review" aria-labelledby="review-title">
+          <h2 id="review-title" class="dashboard-review-title">مراجعة</h2>
+          <p id="review-queue-hint" class="dashboard-review-hint"></p>
+          <div class="dashboard-review-body">
+            <div class="dashboard-review-preview">
+              <button
+                id="review-image-trigger"
+                class="dashboard-review-image-trigger"
+                type="button"
+                aria-label="فتح صورة الإطار للتكبير"
+                hidden
+              >
+              <img
+                id="review-image"
+                class="dashboard-review-image"
+                src=""
+                alt="معاينة الإطار"
+              />
+              </button>
+              <div id="review-empty" class="dashboard-review-empty">اختر صفاً من الجدول.</div>
+            </div>
+            <p id="review-zoom-hint" class="dashboard-review-zoom-hint" hidden>اضغط الصورة لفتحها والتكبير قبل اعتمادها.</p>
+            <dl id="review-meta" class="dashboard-review-meta"></dl>
+            <div class="dashboard-review-actions">
+              <button id="btn-review-prev" type="button" class="action-secondary">معلّق سابق</button>
+              <button id="btn-review-next" type="button" class="action-secondary">معلّق تالي</button>
+              <button id="btn-approve" type="button" class="dashboard-btn-approve">موافقة</button>
+              <button id="btn-reject" type="button" class="dashboard-btn-reject">رفض</button>
+            </div>
+            <a id="map-link" class="dashboard-map-link" href="#" hidden>فتح على الخريطة</a>
+          </div>
+        </aside>
+      </div>
     </main>
 
+    <div id="image-viewer" class="dashboard-image-viewer" hidden>
+      <div id="image-viewer-backdrop" class="dashboard-image-viewer__backdrop"></div>
+      <div class="dashboard-image-viewer__dialog" role="dialog" aria-modal="true" aria-labelledby="image-viewer-title">
+        <div class="dashboard-image-viewer__toolbar">
+          <strong id="image-viewer-title" class="dashboard-image-viewer__title">معاينة الإطار</strong>
+          <div class="dashboard-image-viewer__controls">
+            <button id="image-viewer-zoom-out" type="button" class="action-secondary" aria-label="تصغير">-</button>
+            <span id="image-viewer-zoom-value" class="dashboard-image-viewer__zoom-value">100%</span>
+            <button id="image-viewer-zoom-in" type="button" class="action-secondary" aria-label="تكبير">+</button>
+            <button id="image-viewer-reset" type="button" class="action-secondary">إعادة الضبط</button>
+            <button id="image-viewer-close" type="button" class="action-secondary">إغلاق</button>
+          </div>
+        </div>
+        <div id="image-viewer-stage" class="dashboard-image-viewer__stage">
+          <img id="image-viewer-image" class="dashboard-image-viewer__image" src="" alt="معاينة مكبرة للإطار" />
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="/js/main.js"></script>
+    <script type="module" src="/js/dashboard-page.js"></script>
+    <script type="module" src="/js/auth.js"></script>
   </body>
 </html>

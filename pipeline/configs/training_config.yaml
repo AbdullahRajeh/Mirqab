@@ -1,0 +1,56 @@
+# ============================================================
+# training_config.yaml
+# ============================================================
+# Hyperparameters optimized for 12GB VRAM.
+#
+# KEY DECISIONS:
+# - batch=16: Sweet spot for 12GB with YOLOv8m at 640px.
+#   If you get OOM errors, lower to 8.
+# - imgsz=640: Standard YOLO input size, good balance of
+#   speed vs accuracy for pothole detection.
+# - workers=8: Parallel data loading threads. Adjust based
+#   on your CPU cores (check with: nproc).
+# - amp=True: Mixed precision training (FP16). Cuts VRAM
+#   usage ~40% and speeds up training.
+# ============================================================
+
+# --- Model Selection ---
+# Options: yolov8n (fastest), yolov8s, yolov8m (recommended), yolov8l, yolov8x (most accurate)
+# yolov8m is the best balance for 12GB - accurate enough without OOM
+model: yolov8m.pt
+
+# --- Training Parameters ---
+epochs: 100              # Total training epochs (100 is a solid starting point)
+patience: 20             # Early stopping: stop if no improvement for 20 epochs
+batch: 8                # Batch size (lower to 8 if OOM)
+imgsz: 640               # Input image size (640 is standard for YOLO)
+workers: 2               # Data loading workers (match your CPU core count)
+
+# --- GPU Optimization---
+device: 0                # GPU index (0 = first GPU)
+amp: true                # Mixed precision (FP16) - CRUCIAL for VRAM savings
+
+# --- Learning Rate ---
+lr0: 0.01                # Initial learning rate
+lrf: 0.01                # Final learning rate (lr0 * lrf)
+warmup_epochs: 3         # Warmup epochs for stable start
+
+# --- Data Augmentation (built into YOLO) ---
+# These augmentations help the model generalize to different
+# weather/lighting conditions (important for drone footage)
+hsv_h: 0.015             # Hue shift range
+hsv_s: 0.7               # Saturation shift range
+hsv_v: 0.4               # Brightness shift range
+degrees: 10.0            # Random rotation range (degrees)
+translate: 0.1           # Random translation range
+scale: 0.5               # Random scale range
+fliplr: 0.5              # Horizontal flip probability
+flipud: 0.2              # Vertical flip probability (useful for aerial/drone views)
+mosaic: 1.0              # Mosaic augmentation probability
+mixup: 0.1               # Mixup augmentation probability
+
+# --- Saving & Logging ---
+project: runs/train       # Output directory for training runs
+name: pothole_detection   # Run name
+save_period: 10           # Save checkpoint every N epochs
+plots: true               # Generate training plots

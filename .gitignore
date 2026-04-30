@@ -1,0 +1,29 @@
+node_modules/
+
+# Uploaded videos (temporary, per-machine)
+pipeline/uploads/
+
+# Copied inference frames (large); keep local only
+media/
+
+# Pipeline - Python environment
+pipeline/venv/
+pipeline/__pycache__/
+pipeline/**/__pycache__/
+pipeline/**/*.py[cod]
+
+# Pipeline - large output files (inference videos, dataset)
+pipeline/runs/train/*/weights/epoch*.pt
+pipeline/runs/train/*/weights/last.pt
+pipeline/runs/inference/*/*.mp4
+pipeline/data/
+
+# Pipeline - model weights (stored in Git LFS, not ignored)
+# run: git lfs pull   to download after cloning
+
+# Pipeline - inference frames (large images)
+pipeline/runs/inference/*/frames/
+
+# Pipeline - test media (add your own)
+pipeline/test_media/*
+!pipeline/test_media/.gitkeep
