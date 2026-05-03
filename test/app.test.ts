@@ -197,12 +197,11 @@ test("GET /dashboard redirects to /login when unauthenticated", async () => {
   assert.equal(response.headers.location, "/login");
 });
 
-test("GET /api/v1/detections returns unauthorized without admin session", async () => {
+test("GET /api/v1/detections is now public", async () => {
   const app = createTestApp();
   const response = await request(app).get("/api/v1/detections");
 
-  assert.equal(response.statusCode, 401);
-  assert.equal(response.body.code, "unauthorized");
+  assert.equal(response.statusCode, 200);
 });
 
 test("POST /auth/login rejects invalid credentials", async () => {
@@ -224,7 +223,8 @@ test("POST /auth/logout invalidates session", async () => {
   const logoutResponse = await agent.post("/auth/logout");
   assert.equal(logoutResponse.statusCode, 200);
 
-  const response = await agent.get("/api/v1/videos");
+  // Use a protected endpoint to verify logout
+  const response = await agent.get("/api/v1/detections/reviews");
   assert.equal(response.statusCode, 401);
 });
 

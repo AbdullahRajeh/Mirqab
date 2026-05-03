@@ -35,7 +35,7 @@ export const redirectAuthedAdmin: RequestHandler = (
   next: NextFunction,
 ) => {
   if (isAdminAuthenticated(req)) {
-    res.redirect("/dashboard");
+    res.redirect("/map");
     return;
   }
 

@@ -3,47 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>دخول المشرف | مرقب</title>
+    <title>MIRQAB / LOGIN</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Aref+Ruqaa+Ink:wght@700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=Changa:wght@400;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/main.css" />
     <link rel="stylesheet" href="/css/login.css" />
   </head>
   <body class="auth-page">
-    <main class="login-shell" aria-labelledby="login-title">
-      <div class="login-card" role="region" aria-label="Admin login form">
-        <p class="eyebrow">وصول آمن</p>
-        <h1 id="login-title">بوابة المشرف</h1>
-        <p class="login-lead">أدخل بيانات الإدارة للوصول إلى لوحة التحليلات والواجهات المحمية.</p>
+    <div class="shutter" id="shutter"></div>
+    <div class="bg-layers">
+      <div class="bg-grid"></div>
+      <div class="bg-dots"></div>
+      <div class="bg-noise"></div>
+    </div>
+    
+    <div class="container">
+      <header>
+        <div class="header-left">
+          <a href="/" class="btn-back" aria-label="العودة للرئيسية">
+            <span class="icon">←</span>
+            <span class="text">العودة</span>
+          </a>
+        </div>
+        <div class="header-right">
+          <div class="id-mark">MIRQAB // AUTH_GATEWAY</div>
+          <div class="id-mark">GLOBAL_SECURE_ACCESS</div>
+        </div>
+      </header>
 
-        <form id="login-form" class="login-form" novalidate>
-          <label for="username">اسم المستخدم</label>
-          <input id="username" name="username" type="text" autocomplete="username" required />
+      <main class="login-stage">
+        <div class="login-brand">
+          <img src="/assets/logo.svg" alt="MIRQAB" class="auth-logo" />
+        </div>
 
-          <label for="password">كلمة المرور</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            required
-          />
+        <div class="login-form-area">
+          <div class="form-header">
+            <p class="eyebrow">مصادقة المستخدم</p>
+            <h1>دخول النظام</h1>
+            <p class="lead">الرجاء إدخال بيانات الاعتماد للوصول إلى لوحة المراقبة.</p>
+          </div>
 
-          <button id="login-submit" type="submit">تسجيل الدخول</button>
-          <p id="auth-status" class="auth-status" aria-live="polite"></p>
-        </form>
-      </div>
+          <form id="login-form" class="auth-form" novalidate>
+            <div class="input-group">
+              <label for="username">معرف المستخدم</label>
+              <input id="username" name="username" type="text" autocomplete="username" required placeholder="USER_ID" />
+            </div>
+            
+            <div class="input-group">
+              <label for="password">مفتاح الوصول</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+                placeholder="ACCESS_KEY"
+              />
+            </div>
 
-      <aside class="login-note" aria-hidden="true">
-        <p class="login-note__title">مرقاب</p>
-        <p class="login-note__copy">نظام تحكم مخصص للعرض الإداري ومراقبة جودة الطرق.</p>
-      </aside>
-    </main>
+            <div class="form-actions">
+              <button id="login-submit" type="submit" class="btn-main">تحقق من الهوية</button>
+              <a href="/map" class="btn-guest">الاستمرار كزائر</a>
+            </div>
+            
+            <p id="auth-status" class="auth-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </main>
+
+      <footer>
+        <span>MIRQAB / SECURITY_PROTOCOL_V1</span>
+        <span>© 2026 MIRQAB SYSTEMS</span>
+      </footer>
+    </div>
 
     <script type="module" src="/js/auth.js"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const shutter = document.getElementById('shutter');
+        setTimeout(() => {
+          shutter.classList.add('dismiss');
+        }, 50);
+
+        document.querySelectorAll('a').forEach(link => {
+          link.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('http')) return;
+            
+            e.preventDefault();
+            const container = document.querySelector('.container');
+            shutter.classList.remove('dismiss');
+            // Reset shutter for exit
+            shutter.style.transform = 'translateY(100%)';
+            
+            // Force reflow
+            shutter.offsetHeight;
+            
+            shutter.style.transition = 'transform 0.6s cubic-bezier(0.19, 1, 0.22, 1)';
+            shutter.style.transform = 'translateY(0)';
+            container.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(-20px)';
+            
+            setTimeout(() => {
+              window.location.href = href;
+            }, 400);
+          });
+        });
+      });
+    </script>
   </body>
 </html>
