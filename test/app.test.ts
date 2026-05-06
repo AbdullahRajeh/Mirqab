@@ -12,6 +12,11 @@ import type {
 } from "../src/types";
 import type { DetectionServiceContract } from "../src/services/detection-service";
 import { resetMockWorkflowStore } from "../src/services/mock-workflow-store";
+import {
+  buildPipelineCommand,
+  parsePipelineProgress,
+  type PipelineJob,
+} from "../src/services/pipeline-workflow-store";
 import { HttpError } from "../src/utils/http-error";
 
 class FakeService {
@@ -349,6 +354,41 @@ test("POST /api/v1/mock/videos/upload and GET status succeed when authenticated"
   assert.equal(polled.statusCode, 200);
   assert.equal(polled.body.uploadId, uploadId);
   assert.ok(polled.body.progress >= 0);
+});
+
+test("pipeline command matches the current inference.py CLI", () => {
+  const job: PipelineJob = {
+    uploadId: "upl_1",
+    runName: "run_001",
+    fileName: "clip.mp4",
+    filePath: "C:\\uploads\\clip.mp4",
+    status: "queued",
+    progress: 0,
+    createdAtMs: Date.now(),
+  };
+
+  const { command, args, detectionsPath } = buildPipelineCommand("C:\\repo", job, 30);
+
+  assert.equal(command, process.env.PYTHON_BIN ?? "python");
+  assert.deepEqual(args, [
+    "C:\\repo\\pipeline\\scripts\\inference.py",
+    "--model",
+    "C:\\repo\\pipeline\\models\\best.pt",
+    "--input",
+    "C:\\uploads\\clip.mp4",
+    "--name",
+    "run_001",
+    "--skip-frames",
+    "30",
+  ]);
+  assert.equal(detectionsPath, "C:\\repo\\pipeline\\runs\\inference\\run_001\\detections.json");
+});
+
+test("pipeline progress parser handles fraction and percent output", () => {
+  assert.equal(parsePipelineProgress("PROGRESS:1/4"), 25);
+  assert.equal(parsePipelineProgress("PROGRESS: 3 / 4"), 75);
+  assert.equal(parsePipelineProgress("progress: 42"), 42);
+  assert.equal(parsePipelineProgress("TOTAL_FRAMES:120"), null);
 });
 
 test("PATCH /api/v1/detections/:id/review and GET reviews succeed when authenticated", async () => {

@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
-export type PipelineJobStatus = "queued" | "processing" | "complete" | "error";
+export type PipelineJobStatus = "queued" | "inference" | "complete" | "failed";
 
 export type PipelineJob = {
   uploadId: string;
@@ -19,6 +19,52 @@ export type PipelineJob = {
 
 function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+export function buildPipelineCommand(projectRoot: string, job: PipelineJob, skipFrames: number): {
+  command: string;
+  args: string[];
+  detectionsPath: string;
+} {
+  const pipelineRoot = path.join(projectRoot, "pipeline");
+  const scriptPath = path.join(pipelineRoot, "scripts", "inference.py");
+  const modelPath = path.join(pipelineRoot, "models", "best.pt");
+  const detectionsPath = path.join(pipelineRoot, "runs", "inference", job.runName, "detections.json");
+  const command = process.env.PYTHON_BIN ?? "python";
+
+  return {
+    command,
+    args: [
+      scriptPath,
+      "--model",
+      modelPath,
+      "--input",
+      job.filePath,
+      "--name",
+      job.runName,
+      "--skip-frames",
+      String(skipFrames),
+    ],
+    detectionsPath,
+  };
+}
+
+export function parsePipelineProgress(output: string): number | null {
+  const fractionMatch = output.match(/PROGRESS:\s*(\d+)\s*\/\s*(\d+)/i);
+  if (fractionMatch) {
+    const processed = Number.parseInt(fractionMatch[1], 10);
+    const total = Number.parseInt(fractionMatch[2], 10);
+    if (Number.isFinite(processed) && Number.isFinite(total) && total > 0) {
+      return Math.min(100, Math.max(0, Math.round((processed / total) * 100)));
+    }
+  }
+
+  const percentMatch = output.match(/progress[:\s]+(\d+)(?:\s*%)?/i);
+  if (percentMatch) {
+    return Math.min(100, Math.max(0, Number.parseInt(percentMatch[1], 10)));
+  }
+
+  return null;
 }
 
 export type PipelineWorkflowStore = {
@@ -60,7 +106,7 @@ class PipelineWorkflowStoreImpl {
     // Run the pipeline asynchronously without blocking
     setImmediate(() => {
       this.runPipelineAsync(job, skipFrames).catch((error) => {
-        job.status = "error";
+        job.status = "failed";
         job.error = error instanceof Error ? error.message : String(error);
         console.error(`Pipeline error for ${job.uploadId}:`, error);
       });
@@ -68,56 +114,53 @@ class PipelineWorkflowStoreImpl {
   }
 
   private async runPipelineAsync(job: PipelineJob, skipFrames: number): Promise<void> {
-    job.status = "processing";
+    job.status = "inference";
     job.progress = 0;
 
     try {
-      const scriptPath = path.join(this.projectRoot, "pipeline", "scripts", "inference.py");
-      const outputDir = path.join(this.projectRoot, "pipeline", "outputs", job.runName);
-
-      // Create output directory
-      await fs.promises.mkdir(outputDir, { recursive: true });
+      const { command, args, detectionsPath } = buildPipelineCommand(this.projectRoot, job, skipFrames);
 
       // Call the Python inference script
       await new Promise<void>((resolve, reject) => {
-        const process = spawn("python", [scriptPath, job.filePath, "--output", outputDir, "--skip-frames", String(skipFrames)]);
+        const child = spawn(command, args);
+        let stderrTail = "";
 
-        process.stdout?.on("data", (data: Buffer) => {
+        child.stdout?.on("data", (data: Buffer) => {
           const output = data.toString();
           console.log(`[${job.uploadId}] ${output}`);
 
-          // Try to extract progress from output
-          const progressMatch = output.match(/progress[:\s]+(\d+)/i);
-          if (progressMatch) {
-            job.progress = Math.min(100, parseInt(progressMatch[1], 10));
+          const progress = parsePipelineProgress(output);
+          if (progress !== null) {
+            job.progress = progress;
           }
         });
 
-        process.stderr?.on("data", (data: Buffer) => {
-          console.error(`[${job.uploadId}] ${data.toString()}`);
+        child.stderr?.on("data", (data: Buffer) => {
+          const output = data.toString();
+          stderrTail = `${stderrTail}${output}`.slice(-4000);
+          console.error(`[${job.uploadId}] ${output}`);
         });
 
-        process.on("close", (code: number | null) => {
+        child.on("close", (code: number | null) => {
           if (code === 0) {
-            // Look for the detections output file
-            const detectionsFile = path.join(outputDir, "detections.json");
-            if (fs.existsSync(detectionsFile)) {
-              job.detectionsPath = detectionsFile;
+            if (fs.existsSync(detectionsPath)) {
+              job.detectionsPath = detectionsPath;
             }
             job.progress = 100;
             job.status = "complete";
             resolve();
           } else {
-            reject(new Error(`Pipeline script exited with code ${code}`));
+            const detail = stderrTail.trim();
+            reject(new Error(`Pipeline script exited with code ${code}${detail ? `: ${detail}` : ""}`));
           }
         });
 
-        process.on("error", (error: Error) => {
+        child.on("error", (error: Error) => {
           reject(error);
         });
       });
     } catch (error) {
-      job.status = "error";
+      job.status = "failed";
       job.error = error instanceof Error ? error.message : String(error);
       console.error(`Pipeline error for ${job.uploadId}:`, error);
     }
