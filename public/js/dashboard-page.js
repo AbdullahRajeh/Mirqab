@@ -4,11 +4,10 @@ const FALLBACK_IMAGE =
 const STATS_ENDPOINT = "/api/v1/detections/stats";
 const VIDEOS_ENDPOINT = "/api/v1/videos";
 const REVIEWS_ENDPOINT = "/api/v1/detections/reviews";
-const PIPELINE_UPLOAD = "/api/v1/pipeline/upload";
+const SESSION_ENDPOINT = "/auth/session";
 
-function pipelineUploadStatusUrl(uploadId) {
-  return `/api/v1/pipeline/upload/${encodeURIComponent(uploadId)}`;
-}
+const NEIGHBORHOOD_CACHE_KEY = "mirqab.neighborhoods.v1";
+const UNKNOWN_NEIGHBORHOOD = "حي غير معروف";
 
 function detectionReviewUrl(detectionId) {
   return `/api/v1/detections/${encodeURIComponent(detectionId)}/review`;
@@ -35,42 +34,44 @@ function buildStatsUrl() {
   return q ? `${STATS_ENDPOINT}?${q}` : STATS_ENDPOINT;
 }
 
-const message = document.getElementById("message");
+// Selectors
+const messageEl = document.getElementById("message");
 const totalPinsEl = document.getElementById("total-pins");
+const totalHoodsEl = document.getElementById("total-hoods");
 const worstHoodEl = document.getElementById("worst-hood");
 const avgConfidenceEl = document.getElementById("avg-confidence");
+const maxConfidenceEl = document.getElementById("max-confidence");
+const minConfidenceEl = document.getElementById("min-confidence");
+const mapPointsEl = document.getElementById("map-points");
+const totalVideosEl = document.getElementById("total-videos");
+const totalFramesEl = document.getElementById("total-frames");
+const highConfidenceCountEl = document.getElementById("high-confidence-count");
+const pendingCountEl = document.getElementById("pending-count");
+const approvedCountEl = document.getElementById("approved-count");
+const rejectedCountEl = document.getElementById("rejected-count");
+const hoodListEl = document.getElementById("hood-list");
+const sourceListEl = document.getElementById("source-list");
+const statsScopeEl = document.getElementById("stats-scope");
+const hotspotSummaryEl = document.getElementById("hotspot-summary");
 const pinsBody = document.getElementById("pins-body");
-const pinsTable = document.getElementById("pins-table");
-const chartCanvas = document.getElementById("severityChart");
 
 const videoFilterEl = document.getElementById("video-filter");
-const pageSizeEl = document.getElementById("page-size");
-const sortByEl = document.getElementById("sort-by");
-const sortOrderEl = document.getElementById("sort-order");
-const compactToggleEl = document.getElementById("compact-toggle");
 const btnRefresh = document.getElementById("btn-refresh");
 const pageInfoEl = document.getElementById("page-info");
 const btnPrevPage = document.getElementById("btn-prev-page");
 const btnNextPage = document.getElementById("btn-next-page");
 
-const uploadInput = document.getElementById("upload-input");
-const uploadTrigger = document.getElementById("upload-trigger");
-const uploadFilename = document.getElementById("upload-filename");
-const uploadProgressWrap = document.getElementById("upload-progress-wrap");
-const uploadProgressBar = document.getElementById("upload-progress-bar");
-const uploadStatusText = document.getElementById("upload-status-text");
-
 const reviewImage = document.getElementById("review-image");
 const reviewImageTrigger = document.getElementById("review-image-trigger");
 const reviewEmpty = document.getElementById("review-empty");
-const reviewZoomHint = document.getElementById("review-zoom-hint");
 const reviewMeta = document.getElementById("review-meta");
-const reviewQueueHint = document.getElementById("review-queue-hint");
 const btnReviewPrev = document.getElementById("btn-review-prev");
 const btnReviewNext = document.getElementById("btn-review-next");
 const btnApprove = document.getElementById("btn-approve");
 const btnReject = document.getElementById("btn-reject");
-const mapLink = document.getElementById("map-link");
+const reviewControls = btnApprove?.closest(".monitor-controls") ?? null;
+const reviewGuestNote = document.getElementById("review-guest-note");
+
 const imageViewer = document.getElementById("image-viewer");
 const imageViewerBackdrop = document.getElementById("image-viewer-backdrop");
 const imageViewerImage = document.getElementById("image-viewer-image");
@@ -78,24 +79,34 @@ const imageViewerStage = document.getElementById("image-viewer-stage");
 const imageViewerZoomValue = document.getElementById("image-viewer-zoom-value");
 const imageViewerZoomIn = document.getElementById("image-viewer-zoom-in");
 const imageViewerZoomOut = document.getElementById("image-viewer-zoom-out");
-const imageViewerReset = document.getElementById("image-viewer-reset");
 const imageViewerClose = document.getElementById("image-viewer-close");
+const sortHeaderButtons = Array.from(document.querySelectorAll(".sort-header"));
 
 const state = {
   detections: [],
   stats: null,
   /** @type {Map<string, 'approved' | 'rejected'>} */
   reviews: new Map(),
+  isAdmin: false,
+  neighborhoodCache: loadNeighborhoodCache(),
   total: 0,
   limit: 200,
   offset: 0,
   videoId: "",
   sortBy: "timestampSec",
   sortOrder: "desc",
-  compact: false,
-  chart: null,
+  listSortBy: "",
+  listSortOrder: "",
   activeDetectionId: null,
   imageViewerZoom: 1,
+  charts: {
+    timeConf: null,
+    hoodDensity: null,
+    source: null,
+    review: null,
+    confidenceDist: null,
+    sourceDensity: null
+  }
 };
 
 boot().catch((error) => {
@@ -106,24 +117,23 @@ boot().catch((error) => {
 async function boot() {
   bindUi();
   readControlsFromDom();
+  await loadSession();
   await loadAll({ resetSelection: true });
 }
 
+async function loadSession() {
+  try {
+    const payload = await fetchJson(SESSION_ENDPOINT);
+    state.isAdmin = Boolean(payload.authenticated);
+  } catch {
+    state.isAdmin = false;
+  }
+  applyReviewPermissions();
+}
+
 function readControlsFromDom() {
-  if (pageSizeEl instanceof HTMLSelectElement) {
-    state.limit = Number.parseInt(pageSizeEl.value, 10) || 200;
-  }
-  if (sortByEl instanceof HTMLSelectElement) {
-    state.sortBy = sortByEl.value;
-  }
-  if (sortOrderEl instanceof HTMLSelectElement) {
-    state.sortOrder = sortOrderEl.value;
-  }
   if (videoFilterEl instanceof HTMLSelectElement) {
     state.videoId = videoFilterEl.value.trim();
-  }
-  if (compactToggleEl instanceof HTMLInputElement) {
-    state.compact = compactToggleEl.checked;
   }
 }
 
@@ -140,36 +150,25 @@ function bindUi() {
     }
   });
 
-  pageSizeEl?.addEventListener("change", () => {
-    if (pageSizeEl instanceof HTMLSelectElement) {
-      state.limit = Number.parseInt(pageSizeEl.value, 10) || 200;
-      state.offset = 0;
-      void loadAll({ resetSelection: true });
-    }
-  });
-
-  sortByEl?.addEventListener("change", () => {
-    if (sortByEl instanceof HTMLSelectElement) {
-      state.sortBy = sortByEl.value;
-      state.offset = 0;
-      void loadAll({ resetSelection: true });
-    }
-  });
-
-  sortOrderEl?.addEventListener("change", () => {
-    if (sortOrderEl instanceof HTMLSelectElement) {
-      state.sortOrder = sortOrderEl.value;
-      state.offset = 0;
-      void loadAll({ resetSelection: true });
-    }
-  });
-
-  compactToggleEl?.addEventListener("change", () => {
-    if (compactToggleEl instanceof HTMLInputElement) {
-      state.compact = compactToggleEl.checked;
+  for (const button of sortHeaderButtons) {
+    button.addEventListener("click", () => {
+      const sortBy = button.dataset.sort;
+      if (!isSortableColumn(sortBy)) {
+        return;
+      }
+      if (state.listSortBy !== sortBy) {
+        state.listSortBy = sortBy;
+        state.listSortOrder = "asc";
+      } else if (state.listSortOrder === "asc") {
+        state.listSortOrder = "desc";
+      } else {
+        state.listSortBy = "";
+        state.listSortOrder = "";
+      }
       renderTable();
-    }
-  });
+      renderSortHeaders();
+    });
+  }
 
   btnPrevPage?.addEventListener("click", () => {
     state.offset = Math.max(0, state.offset - state.limit);
@@ -182,28 +181,6 @@ function bindUi() {
       state.offset = next;
       void loadAll({ resetSelection: true });
     }
-  });
-
-  uploadTrigger?.addEventListener("click", () => {
-    uploadInput?.click();
-  });
-
-  uploadInput?.addEventListener("change", () => {
-    const input = uploadInput;
-    if (!(input instanceof HTMLInputElement) || !input.files?.length) {
-      return;
-    }
-    const [file] = input.files;
-    if (uploadFilename) {
-      uploadFilename.textContent = file.name;
-    }
-    const skipFramesEl = document.getElementById("skip-frames-input");
-    const skipFrames =
-      skipFramesEl instanceof HTMLInputElement
-        ? Math.max(1, Math.min(120, Number.parseInt(skipFramesEl.value, 10) || 10))
-        : 10;
-    void runPipelineUpload(file, skipFrames);
-    input.value = "";
   });
 
   btnReviewPrev?.addEventListener("click", () => {
@@ -233,9 +210,6 @@ function bindUi() {
   });
   imageViewerZoomOut?.addEventListener("click", () => {
     setImageViewerZoom(state.imageViewerZoom - 0.25);
-  });
-  imageViewerReset?.addEventListener("click", () => {
-    setImageViewerZoom(1);
   });
   imageViewerStage?.addEventListener(
     "wheel",
@@ -312,26 +286,27 @@ function selectDetection(id) {
 }
 
 async function loadAll({ resetSelection }) {
-  setMessage("جاري تحميل البيانات...", false);
+  setMessage("جاري تحديث البيانات...", false);
   setLoading(true);
   try {
     const [reviewsPayload, videosPayload, statsPayload, detectionsPayload] = await Promise.all([
-      fetchJson(REVIEWS_ENDPOINT),
+      state.isAdmin ? fetchJson(REVIEWS_ENDPOINT) : Promise.resolve({ items: [] }),
       fetchJson(VIDEOS_ENDPOINT),
       fetchJson(buildStatsUrl()),
       fetchJson(buildDetectionsUrl()),
     ]);
 
-    mergeReviews(reviewsPayload.items ?? []);
+    state.detections = normalizeDetections(detectionsPayload.items ?? []);
+    mergeReviews(reviewsPayload.items ?? [], state.detections);
     fillVideoFilter(videosPayload.items ?? []);
     state.stats = statsPayload;
-    state.detections = normalizeDetections(detectionsPayload.items ?? []);
     state.total = Number(detectionsPayload.total ?? 0);
 
     renderStats();
-    renderChart();
     renderPagination();
     renderTable();
+    renderSortHeaders();
+    renderCharts();
 
     if (resetSelection) {
       const pending = getPendingQueue();
@@ -342,23 +317,37 @@ async function loadAll({ resetSelection }) {
     }
 
     renderReviewPanel();
-    setMessage(`تم تحميل ${state.total} اكتشافاً (معروض ${state.detections.length} في هذه الصفحة).`, false);
+    setMessage(
+      state.isAdmin
+        ? `تم استرجاع ${state.total} بلاغ.`
+        : `وضع العرض فقط: تم استرجاع ${state.total} بلاغ.`,
+      false,
+    );
+    
+    // Start neighborhood enrichment
+    void enrichNeighborhoodNames();
   } catch (error) {
     console.error(error);
     setMessage(error instanceof Error ? error.message : "تعذر تحميل البيانات.", true);
-    renderEmptyState();
   } finally {
     setLoading(false);
   }
 }
 
-function mergeReviews(items) {
+function mergeReviews(reviewItems, detections) {
   state.reviews.clear();
-  for (const row of items) {
+  // 1. Fill from reviews endpoint (authoritative)
+  for (const row of reviewItems) {
     const id = row.detection_id;
     const decision = row.decision;
     if (id && (decision === "approved" || decision === "rejected")) {
       state.reviews.set(id, decision);
+    }
+  }
+  // 2. Fill from detections list (backup/redundancy)
+  for (const d of detections) {
+    if (d.id && d.reviewStatus && !state.reviews.has(d.id)) {
+      state.reviews.set(d.id, d.reviewStatus);
     }
   }
 }
@@ -368,114 +357,30 @@ function fillVideoFilter(items) {
     return;
   }
   const current = state.videoId;
-  const options = ['<option value="">الكل</option>'];
+  const options = ['<option value="">كل المصادر</option>'];
   for (const v of items) {
     const vid = escapeHtml(String(v.video_id ?? ""));
     const selected = v.video_id === current ? " selected" : "";
     options.push(`<option value="${vid}"${selected}>${vid}</option>`);
   }
   videoFilterEl.innerHTML = options.join("");
-  if (current) {
-    videoFilterEl.value = current;
-  }
-}
-
-const STATUS_LABELS = {
-  queued: "في الانتظار...",
-  inference: "تحليل الفيديو...",
-  gps: "استخراج إحداثيات GPS...",
-  complete: "اكتملت المعالجة",
-  failed: "فشلت المعالجة",
-};
-
-function xhrUpload(url, formData, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) onProgress(e.loaded / e.total);
-    });
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)); }
-        catch { reject(new Error("Invalid JSON response")); }
-      } else {
-        let msg = `Upload failed (${xhr.status})`;
-        try { msg = JSON.parse(xhr.responseText).message ?? msg; } catch {}
-        reject(new Error(msg));
-      }
-    });
-    xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-    xhr.send(formData);
-  });
-}
-
-async function runPipelineUpload(file, skipFrames = 10) {
-  if (uploadProgressWrap) {
-    uploadProgressWrap.hidden = false;
-  }
-  setUploadProgress(0, "جاري رفع الفيديو...");
-  try {
-    const formData = new FormData();
-    formData.append("video", file);
-    formData.append("skipFrames", String(skipFrames));
-    // XHR so we get real upload progress events
-    const created = await xhrUpload(PIPELINE_UPLOAD, formData, (ratio) => {
-      setUploadProgress(Math.round(ratio * 25), `جاري رفع الفيديو... ${Math.round(ratio * 100)}%`);
-    });
-    const uploadId = created.uploadId;
-    setUploadProgress(created.progress ?? 0, STATUS_LABELS[created.status] ?? created.status);
-    await pollPipelineUntilDone(uploadId);
-    setMessage(`اكتملت المعالجة (${file.name}). جارٍ تحديث البيانات...`, false);
-    await loadAll({ resetSelection: true });
-  } catch (error) {
-    console.error(error);
-    setMessage(error instanceof Error ? error.message : "تعذر إكمال معالجة الفيديو.", true);
-  } finally {
-    if (uploadProgressWrap) {
-      uploadProgressWrap.hidden = true;
-    }
-    setUploadProgress(0, "");
-  }
-}
-
-function setUploadProgress(pct, label) {
-  if (uploadProgressBar instanceof HTMLElement) {
-    uploadProgressBar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-  }
-  if (uploadStatusText) {
-    uploadStatusText.textContent = label;
-  }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-async function pollPipelineUntilDone(uploadId) {
-  // Pipeline can take several minutes; poll every 3 seconds for up to 30 min
-  for (let tick = 0; tick < 600; tick += 1) {
-    const status = await fetchJson(pipelineUploadStatusUrl(uploadId));
-    const label = STATUS_LABELS[status.status] ?? status.status;
-    setUploadProgress(status.progress ?? 0, `${label} — ${status.progress ?? 0}%`);
-    if (status.status === "complete") {
-      return;
-    }
-    if (status.status === "failed") {
-      throw new Error(status.error ?? "فشلت المعالجة.");
-    }
-    await sleep(3000);
-  }
-  throw new Error("انتهت مهلة انتظار المعالجة.");
 }
 
 async function submitReview(decision) {
   const id = state.activeDetectionId;
-  if (!id || state.reviews.has(id)) {
+  if (!state.isAdmin) {
+    setMessage("يلزم تسجيل دخول المشرف لاعتماد أو استبعاد البلاغات.", true);
     return;
   }
+  if (!id) {
+    return;
+  }
+
+  // If the decision is already the same, no need to re-submit
+  if (state.reviews.get(id) === decision) {
+    return;
+  }
+
   setLoading(true);
   try {
     await fetchJson(detectionReviewUrl(id), {
@@ -483,12 +388,21 @@ async function submitReview(decision) {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ decision }),
     });
+    
+    const wasAlreadyReviewed = state.reviews.has(id);
     state.reviews.set(id, decision);
-    const pending = getPendingQueue();
-    state.activeDetectionId = pending[0]?.id ?? null;
+    
+    // Only move to next if it was a first-time review
+    if (!wasAlreadyReviewed) {
+      const pending = getPendingQueue();
+      state.activeDetectionId = pending[0]?.id ?? null;
+    }
+
+    renderStats();
     renderTable();
     renderReviewPanel();
-    setMessage(decision === "approved" ? "تمت الموافقة على الاكتشاف." : "تم رفض الاكتشاف.", false);
+    renderCharts();
+    setMessage(decision === "approved" ? "تم الاعتماد." : "تم الاستبعاد.", false);
   } catch (error) {
     console.error(error);
     setMessage(error instanceof Error ? error.message : "تعذر حفظ المراجعة.", true);
@@ -501,27 +415,11 @@ async function fetchJson(url, init) {
   const response = await fetch(url, {
     credentials: "same-origin",
     ...init,
-    headers: {
-      Accept: "application/json",
-      ...init?.headers,
-    },
+    headers: { Accept: "application/json", ...init?.headers },
   });
 
-  if (response.status === 401) {
-    throw new Error("يلزم تسجيل دخول المشرف. انتقل إلى صفحة /login ثم أعد المحاولة.");
-  }
-
-  if (!response.ok) {
-    let details = response.statusText;
-    try {
-      const payload = await response.json();
-      details = payload.message || payload.code || details;
-    } catch {
-      // ignore
-    }
-    throw new Error(details || `Request failed with status ${response.status}`);
-  }
-
+  if (response.status === 401) throw new Error("يلزم تسجيل دخول المشرف.");
+  if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
   return response.json();
 }
 
@@ -532,89 +430,392 @@ function normalizeDetections(items) {
     videoId: item.video_id,
     frameId: item.frame_id,
     timestampSec: Number(item.video_timestamp_sec),
-    confidencePct: toPercent(item.confidence),
+    confidencePct: Math.round(Number(item.confidence ?? 0) * 100),
     lat: Number(item.gps?.latitude),
     lng: Number(item.gps?.longitude),
     imageUrl: item.image_url,
+    reviewStatus: item.review_status,
+    neighborhood: getCachedNeighborhood(Number(item.gps?.latitude), Number(item.gps?.longitude)),
   }));
+}
+
+// Neighborhood Logic
+function loadNeighborhoodCache() {
+  try { return JSON.parse(localStorage.getItem(NEIGHBORHOOD_CACHE_KEY) || "{}"); } catch { return {}; }
+}
+
+function saveNeighborhoodCache() {
+  try { localStorage.setItem(NEIGHBORHOOD_CACHE_KEY, JSON.stringify(state.neighborhoodCache)); } catch {}
+}
+
+function coordinateKey(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+}
+
+function getCachedNeighborhood(lat, lng) {
+  const key = coordinateKey(lat, lng);
+  return key ? state.neighborhoodCache[key] || "" : "";
+}
+
+async function enrichNeighborhoodNames() {
+  const uniquePoints = [];
+  const seen = new Set();
+  for (const d of state.detections) {
+    const key = coordinateKey(d.lat, d.lng);
+    if (!key || seen.has(key) || state.neighborhoodCache[key]) continue;
+    seen.add(key);
+    uniquePoints.push({ key, lat: d.lat, lng: d.lng });
+  }
+  for (const p of uniquePoints) {
+    const neighborhood = await reverseGeocodeNeighborhood(p.lat, p.lng);
+    state.neighborhoodCache[p.key] = neighborhood;
+    saveNeighborhoodCache();
+    applyNeighborhood(p.key, neighborhood);
+    renderStats();
+    renderTable();
+    renderCharts();
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
+async function reverseGeocodeNeighborhood(lat, lng) {
+  try {
+    const params = new URLSearchParams({ format: "jsonv2", lat: String(lat), lon: String(lng), zoom: "14", addressdetails: "1", "accept-language": "ar" });
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`);
+    if (!response.ok) return UNKNOWN_NEIGHBORHOOD;
+    const payload = await response.json();
+    const address = payload.address || {};
+    return address.neighbourhood || address.suburb || address.quarter || address.city_district || address.district || address.village || address.town || address.city || address.county || UNKNOWN_NEIGHBORHOOD;
+  } catch { return UNKNOWN_NEIGHBORHOOD; }
+}
+
+function applyNeighborhood(key, neighborhood) {
+  for (const d of state.detections) { if (coordinateKey(d.lat, d.lng) === key) d.neighborhood = neighborhood; }
 }
 
 function renderStats() {
   const stats = state.stats;
-  if (!stats) {
-    renderEmptyState();
-    return;
+  if (!stats) return;
+
+  const hoodCounts = new Map();
+  for (const d of state.detections) {
+    const name = d.neighborhood || UNKNOWN_NEIGHBORHOOD;
+    hoodCounts.set(name, (hoodCounts.get(name) || 0) + 1);
   }
 
-  const topVideo = [...(stats.per_video ?? [])].sort(
-    (left, right) => right.detection_count - left.detection_count,
-  )[0];
+  let worstHood = "-";
+  let maxCount = 0;
+  for (const [name, count] of hoodCounts.entries()) {
+    if (name !== UNKNOWN_NEIGHBORHOOD && count > maxCount) {
+      worstHood = name;
+      maxCount = count;
+    }
+  }
 
   setText(totalPinsEl, String(stats.total_detections ?? 0));
-  setText(avgConfidenceEl, formatPercent(stats.average_confidence));
-  setText(worstHoodEl, topVideo ? formatVideoId(topVideo.video_id) : "-");
+  setText(mapPointsEl, String(new Set(state.detections.map((d) => d.pointId)).size));
+  setText(totalVideosEl, String(stats.unique_videos ?? 0));
+  setText(totalFramesEl, String(stats.unique_frames ?? 0));
+  setText(totalHoodsEl, String(hoodCounts.size));
+  setText(worstHoodEl, worstHood);
+  setText(avgConfidenceEl, `${Math.round((stats.average_confidence ?? 0) * 100)}%`);
+  setText(maxConfidenceEl, `${Math.round((stats.max_confidence ?? 0) * 100)}%`);
+  setText(minConfidenceEl, `${Math.round((stats.min_confidence ?? 0) * 100)}%`);
+  setText(highConfidenceCountEl, String(state.detections.filter((d) => d.confidencePct >= 80).length));
+  const reviewCounts = getReviewCounts();
+  setText(pendingCountEl, String(reviewCounts.pending));
+  setText(approvedCountEl, String(reviewCounts.approved));
+  setText(rejectedCountEl, String(reviewCounts.rejected));
+  setText(statsScopeEl, state.videoId ? formatVideoId(state.videoId) : "كل المصادر");
+
+  if (hoodListEl) {
+    if (hoodCounts.size === 0) {
+      hoodListEl.innerHTML = '<div class="hood-empty">جاري معالجة الإحداثيات...</div>';
+    } else {
+      const sortedHoods = [...hoodCounts.entries()].sort((a, b) => b[1] - a[1]);
+      const maxHoodCount = Math.max(...sortedHoods.map(([, count]) => count), 1);
+      hoodListEl.innerHTML = sortedHoods.slice(0, 6).map(([name, count]) => `
+        <div class="hood-card">
+          <div class="hood-card__top">
+            <span class="hood-name">${escapeHtml(name)}</span>
+            <span class="hood-count mono">${count}</span>
+          </div>
+          <div class="hood-bar"><span style="width:${Math.round((count / maxHoodCount) * 100)}%"></span></div>
+          <div class="hood-meta">
+            <span>${formatShare(count, state.detections.length)} من البلاغات</span>
+            <span>${count === maxHoodCount ? "الأعلى كثافة" : "ضمن النطاق"}</span>
+          </div>
+        </div>
+      `).join("");
+    }
+  }
+
+  renderHotspotSummary([...hoodCounts.entries()].sort((a, b) => b[1] - a[1]));
+
+  renderSourceStats(stats.per_video ?? []);
 }
 
-function renderPagination() {
-  if (!pageInfoEl) {
+function renderHotspotSummary(sortedHoods) {
+  if (!hotspotSummaryEl) return;
+  const [topName, topCount] = sortedHoods.find(([name]) => name !== UNKNOWN_NEIGHBORHOOD) ?? sortedHoods[0] ?? [];
+  if (!topName) {
+    hotspotSummaryEl.innerHTML = '<span class="muted">لا توجد مواقع ضمن النطاق الحالي.</span>';
     return;
   }
+  const total = state.detections.length || 1;
+  const sourceCount = state.stats?.unique_videos ?? 0;
+  hotspotSummaryEl.innerHTML = `
+    <div class="hotspot-summary-main">
+      <span class="hotspot-summary-name">${escapeHtml(topName)}</span>
+      <span class="hotspot-summary-count mono">${Number(topCount ?? 0)}</span>
+    </div>
+    <div class="hotspot-summary-meta">
+      يمثل ${formatShare(Number(topCount ?? 0), total)} من بلاغات النطاق الحالي عبر ${sourceCount} مصدر.
+    </div>
+  `;
+}
+
+function renderSourceStats(items) {
+  if (!sourceListEl) return;
+  if (items.length === 0) {
+    sourceListEl.innerHTML = '<div class="hood-card"><span class="hood-name">لا توجد مصادر</span><span class="hood-count mono">0</span></div>';
+    return;
+  }
+  const sortedItems = [...items]
+    .sort((a, b) => Number(b.detection_count ?? 0) - Number(a.detection_count ?? 0))
+    .slice(0, 6);
+  const maxCount = Math.max(...sortedItems.map((item) => Number(item.detection_count ?? 0)), 1);
+  sourceListEl.innerHTML = sortedItems
+    .map((item) => {
+      const count = Number(item.detection_count ?? 0);
+      return `
+      <div class="source-stat-card">
+        <div class="source-stat-top">
+          <span class="source-stat-name">${escapeHtml(formatVideoId(item.video_id))}</span>
+          <span class="source-stat-count mono">${count}</span>
+        </div>
+        <div class="source-stat-bar"><span style="width:${Math.round((count / maxCount) * 100)}%"></span></div>
+        <div class="source-stat-meta">
+          <span>${Number(item.frame_count ?? 0)} إطار</span>
+          <span>${formatPercent(item.average_confidence)} ثقة</span>
+          <span>${formatSeconds(item.first_detection_sec)}-${formatSeconds(item.last_detection_sec)}</span>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
+}
+
+function renderCharts() {
+  if (!globalThis.Chart) return;
+  const stats = state.stats;
+  if (!stats) return;
+
+  // 1. Time-Confidence Scatter Plot
+  const scatterData = state.detections.map(d => ({ x: d.timestampSec, y: d.confidencePct }));
+  const ctxTime = document.getElementById('timeConfidenceChart')?.getContext('2d');
+  if (ctxTime) {
+    if (state.charts.timeConf) state.charts.timeConf.destroy();
+    state.charts.timeConf = new Chart(ctxTime, {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: 'Confidence/Time',
+          data: scatterData,
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          pointRadius: 4,
+          hoverRadius: 6
+        }]
+      },
+      options: {
+        ...chartOptions,
+        scales: {
+          x: { type: 'linear', position: 'bottom', ticks: { color: '#666', font: { family: 'JetBrains Mono' } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+          y: { min: 0, max: 100, ticks: { color: '#666', font: { family: 'JetBrains Mono' } }, grid: { color: 'rgba(255,255,255,0.03)' } }
+        }
+      }
+    });
+  }
+
+  // 2. Neighborhood density ranking
+  const hoodCounts = new Map();
+  for (const d of state.detections) {
+    const name = d.neighborhood || UNKNOWN_NEIGHBORHOOD;
+    hoodCounts.set(name, (hoodCounts.get(name) || 0) + 1);
+  }
+  const hoodItems = [...hoodCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7);
+  const ctxHoodDensity = document.getElementById('hoodDensityChart')?.getContext('2d');
+  if (ctxHoodDensity) {
+    if (state.charts.hoodDensity) state.charts.hoodDensity.destroy();
+    state.charts.hoodDensity = new Chart(ctxHoodDensity, {
+      type: 'bar',
+      data: {
+        labels: hoodItems.map(([name]) => name),
+        datasets: [{
+          data: hoodItems.map(([, count]) => count),
+          backgroundColor: '#ffffff',
+          borderWidth: 0,
+          maxBarThickness: 18
+        }]
+      },
+      options: {
+        ...chartOptions,
+        indexAxis: 'y',
+        scales: compactCartesianScales()
+      }
+    });
+  }
+
+  // 3. Source Quality (Polar Area)
+  const topSources = [...(stats.per_video ?? [])].sort((a, b) => b.detection_count - a.detection_count).slice(0, 5);
+  const polarLabels = topSources.map(v => v.video_id.replace(/_/g, " ").toUpperCase());
+  const polarData = topSources.map(v => Math.round((v.average_confidence ?? 0) * 100));
+
+  const ctxSource = document.getElementById('sourceQualityChart')?.getContext('2d');
+  if (ctxSource) {
+    if (state.charts.source) state.charts.source.destroy();
+    state.charts.source = new Chart(ctxSource, {
+      type: 'polarArea',
+      data: {
+        labels: polarLabels,
+        datasets: [{
+          data: polarData,
+          backgroundColor: ['#ffffff', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        ...chartOptions,
+        plugins: { legend: { display: false } },
+        scale: { gridLines: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+      }
+    });
+  }
+
+  // 4. Review Status (Doughnut)
+  const { approved, rejected, pending } = getReviewCounts();
+
+  const ctxReview = document.getElementById('reviewStatusChart')?.getContext('2d');
+  if (ctxReview) {
+    if (state.charts.review) state.charts.review.destroy();
+    state.charts.review = new Chart(ctxReview, {
+      type: 'doughnut',
+      data: {
+        labels: ['معتمد', 'مستبعد', 'معلق'],
+        datasets: [{
+          data: [approved, rejected, pending],
+          backgroundColor: ['#ffffff', '#ff453a', 'rgba(255,255,255,0.1)'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        ...chartOptions,
+        cutoutPercentage: 80,
+        plugins: { legend: { display: true, position: 'right', labels: { color: '#666', font: { family: 'Cairo' } } } }
+      }
+    });
+  }
+
+  // 5. Confidence buckets
+  const buckets = [0, 0, 0, 0, 0];
+  for (const d of state.detections) {
+    buckets[Math.min(4, Math.floor(d.confidencePct / 20.1))] += 1;
+  }
+  const ctxConfidence = document.getElementById('confidenceDistChart')?.getContext('2d');
+  if (ctxConfidence) {
+    if (state.charts.confidenceDist) state.charts.confidenceDist.destroy();
+    state.charts.confidenceDist = new Chart(ctxConfidence, {
+      type: 'bar',
+      data: {
+        labels: ['0-20', '21-40', '41-60', '61-80', '81-100'],
+        datasets: [{ data: buckets, backgroundColor: '#ffffff', borderWidth: 0, maxBarThickness: 22 }]
+      },
+      options: {
+        ...chartOptions,
+        scales: compactCartesianScales()
+      }
+    });
+  }
+
+  // 6. Source density
+  const densitySources = [...(stats.per_video ?? [])].sort((a, b) => b.detection_count - a.detection_count).slice(0, 6);
+  const ctxDensity = document.getElementById('sourceDensityChart')?.getContext('2d');
+  if (ctxDensity) {
+    if (state.charts.sourceDensity) state.charts.sourceDensity.destroy();
+    state.charts.sourceDensity = new Chart(ctxDensity, {
+      type: 'bar',
+      data: {
+        labels: densitySources.map((v) => formatVideoId(v.video_id)),
+        datasets: [{ data: densitySources.map((v) => v.detection_count), backgroundColor: '#ffffff', borderWidth: 0, maxBarThickness: 18 }]
+      },
+      options: {
+        ...chartOptions,
+        indexAxis: 'y',
+        scales: compactCartesianScales()
+      }
+    });
+  }
+}
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  animation: { duration: 0 }
+};
+
+function renderPagination() {
+  if (!pageInfoEl) return;
   const from = state.total === 0 ? 0 : state.offset + 1;
   const to = Math.min(state.offset + state.detections.length, state.total);
-  pageInfoEl.textContent = `${from}–${to} من ${state.total}`;
-  if (btnPrevPage instanceof HTMLButtonElement) {
-    btnPrevPage.disabled = state.offset <= 0;
-  }
-  if (btnNextPage instanceof HTMLButtonElement) {
-    btnNextPage.disabled = state.offset + state.limit >= state.total;
+  pageInfoEl.textContent = `${from}-${to} // ${state.total}`;
+  if (btnPrevPage instanceof HTMLButtonElement) btnPrevPage.disabled = state.offset <= 0;
+  if (btnNextPage instanceof HTMLButtonElement) btnNextPage.disabled = state.offset + state.limit >= state.total;
+}
+
+function renderSortHeaders() {
+  for (const button of sortHeaderButtons) {
+    const isActive = button.dataset.sort === state.listSortBy;
+    button.classList.toggle("is-active", isActive);
+    button.dataset.direction = isActive ? (state.listSortOrder === "asc" ? "↑" : "↓") : "";
+    button.title = isActive
+      ? "اضغط مرة أخرى لعكس الترتيب، ثم مرة ثالثة لإزالة الترتيب"
+      : "ترتيب القائمة";
   }
 }
 
 function renderTable() {
-  if (!pinsBody) {
-    return;
-  }
-
-  pinsTable?.classList.toggle("is-compact", state.compact);
-
+  if (!pinsBody) return;
   if (state.detections.length === 0) {
-    pinsBody.innerHTML =
-      '<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 2rem 0;">لا توجد اكتشافات لعرضها.</td></tr>';
+    pinsBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--muted); font-style:italic;">لا توجد بيانات متاحة</td></tr>';
     return;
   }
 
-  pinsBody.innerHTML = state.detections
-    .map((detection) => {
-      const decision = state.reviews.get(detection.id);
+  pinsBody.innerHTML = getVisibleDetections()
+    .map((d) => {
+      const decision = state.reviews.get(d.id);
       const badge = decision
         ? decision === "approved"
-          ? '<span class="review-badge review-badge--approved">موافق</span>'
-          : '<span class="review-badge review-badge--rejected">مرفوض</span>'
-        : '<span class="review-badge review-badge--pending">معلّق</span>';
-      const rowClasses = [];
-      if (detection.id === state.activeDetectionId) {
-        rowClasses.push("pin-row--selected");
-      }
-      const rowClassAttr = rowClasses.length > 0 ? ` class="${rowClasses.join(" ")}"` : "";
-      const mapHref = `/?focus=${encodeURIComponent(detection.pointId)}`;
+          ? '<span style="color:var(--fg); font-weight:900;">تم الاعتماد</span>'
+          : '<span style="color:var(--muted);">مستبعد</span>'
+        : '<span style="color:var(--muted); opacity:0.3;">قيد المراجعة</span>';
+      
+      const rowClass = d.id === state.activeDetectionId ? ' class="pin-row--selected"' : "";
+      
       return `
-        <tr${rowClassAttr} data-detection-id="${escapeHtml(detection.id)}">
-          <td><img src="${escapeHtml(detection.imageUrl)}" class="pin-row__img" alt="" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}'"></td>
-          <td class="pin-row__hood">${escapeHtml(formatVideoId(detection.videoId))}</td>
-          <td>${escapeHtml(String(detection.frameId))}</td>
-          <td>${escapeHtml(formatSeconds(detection.timestampSec))}</td>
+        <tr${rowClass} data-detection-id="${escapeHtml(d.id)}">
+          <td><img src="${escapeHtml(d.imageUrl)}" class="pin-row__img" alt="" onerror="this.src='${FALLBACK_IMAGE}'"></td>
+          <td class="pin-row__hood">${escapeHtml(d.neighborhood || "...") }</td>
+          <td>${escapeHtml(d.videoId.replace(/_/g, " ").toUpperCase())}</td>
+          <td class="mono" style="font-size:0.75rem; opacity:0.72;">${escapeHtml(String(d.frameId))}</td>
+          <td class="mono" style="font-size:0.8rem; opacity:0.6;">${formatSeconds(d.timestampSec)}</td>
           <td>
-            <div class="pin-row__confidence">
-              <div class="pin-row__bar">
-                <div class="pin-row__bar-fill" style="width:${detection.confidencePct}%;"></div>
-              </div>
-              <span class="pin-row__value">${detection.confidencePct}%</span>
-            </div>
+            <div class="confidence-bar"><div class="confidence-fill" style="width:${d.confidencePct}%"></div></div>
+            <span class="mono" style="font-size:0.68rem; opacity:0.62;">${d.confidencePct}%</span>
           </td>
+          <td class="mono" style="font-size:0.68rem; opacity:0.55;">${formatCoordinates(d.lat, d.lng)}</td>
           <td>${badge}</td>
-          <td>
-            <a class="pin-row__view-btn pin-row__select-btn" href="${mapHref}">خريطة</a>
-          </td>
         </tr>
       `;
     })
@@ -622,258 +823,187 @@ function renderTable() {
 }
 
 function renderReviewPanel() {
-  const pending = getPendingQueue();
-  if (reviewQueueHint) {
-    reviewQueueHint.textContent =
-      pending.length > 0 ? `${pending.length} بانتظار المراجعة في هذه الصفحة` : "لا توجد عناصر معلّقة في هذه الصفحة";
-  }
-
-  const detection = state.detections.find((d) => d.id === state.activeDetectionId) ?? null;
-  if (!detection) {
-    if (reviewImageTrigger instanceof HTMLButtonElement) {
-      reviewImageTrigger.hidden = true;
-    }
-    if (reviewImage instanceof HTMLImageElement) {
-      reviewImage.removeAttribute("src");
-    }
-    if (reviewZoomHint) {
-      reviewZoomHint.hidden = true;
-    }
-    if (reviewEmpty) {
-      reviewEmpty.hidden = false;
-    }
-    if (reviewMeta) {
-      reviewMeta.innerHTML = "";
-    }
-    if (mapLink instanceof HTMLAnchorElement) {
-      mapLink.hidden = true;
-    }
-    if (btnApprove instanceof HTMLButtonElement) {
-      btnApprove.disabled = true;
-    }
-    if (btnReject instanceof HTMLButtonElement) {
-      btnReject.disabled = true;
-    }
+  const d = state.detections.find((item) => item.id === state.activeDetectionId) ?? null;
+  if (!d) {
+    if (reviewImageTrigger) reviewImageTrigger.hidden = true;
+    if (reviewEmpty) reviewEmpty.hidden = false;
+    if (reviewMeta) reviewMeta.innerHTML = "";
+    if (btnApprove) btnApprove.disabled = true;
+    if (btnReject) btnReject.disabled = true;
     return;
   }
 
-  if (reviewEmpty) {
-    reviewEmpty.hidden = true;
-  }
-  if (reviewImageTrigger instanceof HTMLButtonElement) {
-    reviewImageTrigger.hidden = false;
-  }
-  if (reviewImage instanceof HTMLImageElement) {
-    reviewImage.src = detection.imageUrl;
-    reviewImage.alt = `إطار ${detection.frameId}`;
-    reviewImage.onerror = () => {
-      reviewImage.onerror = null;
-      reviewImage.src = FALLBACK_IMAGE;
-    };
-  }
-  if (reviewZoomHint) {
-    reviewZoomHint.hidden = false;
-  }
+  if (reviewEmpty) reviewEmpty.hidden = true;
+  if (reviewImageTrigger) reviewImageTrigger.hidden = false;
+  if (reviewImage) reviewImage.src = d.imageUrl;
 
-  const reviewed = state.reviews.has(detection.id);
-  if (btnApprove instanceof HTMLButtonElement) {
-    btnApprove.disabled = reviewed;
+  if (btnApprove) {
+    btnApprove.disabled = !state.isAdmin;
+    btnApprove.classList.toggle("is-active", state.reviews.get(d.id) === "approved");
   }
-  if (btnReject instanceof HTMLButtonElement) {
-    btnReject.disabled = reviewed;
+  if (btnReject) {
+    btnReject.disabled = !state.isAdmin;
+    btnReject.classList.toggle("is-active", state.reviews.get(d.id) === "rejected");
   }
 
   if (reviewMeta) {
-    const decision = state.reviews.get(detection.id);
-    reviewMeta.innerHTML = `
-      <dt>الفيديو</dt><dd>${escapeHtml(formatVideoId(detection.videoId))}</dd>
-      <dt>الإطار</dt><dd>${escapeHtml(String(detection.frameId))}</dd>
-      <dt>الوقت</dt><dd>${escapeHtml(formatSeconds(detection.timestampSec))}</dd>
-      <dt>الثقة</dt><dd>${detection.confidencePct}%</dd>
-      <dt>الإحداثيات</dt><dd>${escapeHtml(`${detection.lat.toFixed(5)}, ${detection.lng.toFixed(5)}`)}</dd>
-      <dt>المراجعة</dt><dd>${decision ? (decision === "approved" ? "موافق" : "مرفوض") : "معلّق"}</dd>
-    `;
+    const decision = state.reviews.get(d.id);
+    const status = decision ? (decision === "approved" ? "تم الاعتماد" : "مستبعد") : "قيد المراجعة";
+    const mapUrl = `/map?focus=${encodeURIComponent(d.pointId)}`;
+    const rows = [
+      { label: "معرف البلاغ", value: d.id, wide: false },
+      { label: "الحي", value: d.neighborhood || "جاري التحديد..." },
+      { label: "المصدر", value: d.videoId.replace(/_/g, " ").toUpperCase() },
+      { label: "الإطار", value: `FRAME_${d.frameId}` },
+      { label: "الوقت", value: formatSeconds(d.timestampSec) },
+      { label: "الثقة", value: `${d.confidencePct}%` },
+      { label: "الإحداثيات", value: formatCoordinates(d.lat, d.lng) },
+      { label: "الحالة", value: status },
+    ];
+    reviewMeta.innerHTML = [
+      ...rows.map(r => `<div class="detail-item-small${r.wide ? " is-wide" : ""}"><span>${r.label}</span><span>${escapeHtml(r.value)}</span></div>`),
+      `<div class="detail-item-small is-wide"><span>الخريطة</span><span><a class="detail-link" href="${mapUrl}">فتح الدبوس على الخريطة</a></span></div>`,
+    ].join("");
   }
+}
 
-  if (mapLink instanceof HTMLAnchorElement) {
-    mapLink.hidden = false;
-    mapLink.href = `/?focus=${encodeURIComponent(detection.pointId)}`;
+function applyReviewPermissions() {
+  const disabled = !state.isAdmin;
+  if (reviewControls instanceof HTMLElement) {
+    reviewControls.hidden = disabled;
+  }
+  if (reviewGuestNote instanceof HTMLElement) {
+    reviewGuestNote.hidden = !disabled;
+  }
+  if (btnApprove) {
+    btnApprove.disabled = disabled;
+    btnApprove.title = disabled ? "يلزم تسجيل دخول المشرف للاعتماد" : "";
+  }
+  if (btnReject) {
+    btnReject.disabled = disabled;
+    btnReject.title = disabled ? "يلزم تسجيل دخول المشرف للاستبعاد" : "";
   }
 }
 
 function openImageViewer() {
-  const detection = state.detections.find((d) => d.id === state.activeDetectionId) ?? null;
-  if (!detection || !(imageViewer instanceof HTMLElement) || !(imageViewerImage instanceof HTMLImageElement)) {
-    return;
-  }
-
+  const d = state.detections.find((item) => item.id === state.activeDetectionId) ?? null;
+  if (!d || !imageViewer || !imageViewerImage) return;
   imageViewer.hidden = false;
-  document.body.classList.add("dashboard-image-viewer-open");
-  imageViewerImage.src = detection.imageUrl;
-  imageViewerImage.alt = `إطار ${detection.frameId}`;
-  imageViewerImage.onerror = () => {
-    imageViewerImage.onerror = null;
-    imageViewerImage.src = FALLBACK_IMAGE;
-  };
+  imageViewerImage.src = d.imageUrl;
   setImageViewerZoom(1);
-  imageViewerClose instanceof HTMLButtonElement && imageViewerClose.focus();
 }
 
-function closeImageViewer() {
-  if (!(imageViewer instanceof HTMLElement) || !(imageViewerImage instanceof HTMLImageElement)) {
-    return;
-  }
-  imageViewer.hidden = true;
-  document.body.classList.remove("dashboard-image-viewer-open");
-  imageViewerImage.removeAttribute("src");
-  if (imageViewerStage instanceof HTMLElement) {
-    imageViewerStage.scrollTop = 0;
-    imageViewerStage.scrollLeft = 0;
-  }
-}
+function closeImageViewer() { if (imageViewer) imageViewer.hidden = true; }
 
 function setImageViewerZoom(value) {
   const nextZoom = Math.max(1, Math.min(4, Math.round(value * 100) / 100));
   state.imageViewerZoom = nextZoom;
-
-  if (imageViewerImage instanceof HTMLImageElement) {
-    imageViewerImage.style.width = `${nextZoom * 100}%`;
-  }
-  if (imageViewerZoomValue) {
-    imageViewerZoomValue.textContent = `${Math.round(nextZoom * 100)}%`;
-  }
-  if (imageViewerZoomIn instanceof HTMLButtonElement) {
-    imageViewerZoomIn.disabled = nextZoom >= 4;
-  }
-  if (imageViewerZoomOut instanceof HTMLButtonElement) {
-    imageViewerZoomOut.disabled = nextZoom <= 1;
-  }
+  if (imageViewerImage) imageViewerImage.style.width = `${nextZoom * 100}%`;
+  if (imageViewerZoomValue) imageViewerZoomValue.textContent = `${Math.round(nextZoom * 100)}%`;
 }
 
-function renderChart() {
-  if (!chartCanvas) {
-    return;
+function getReviewCounts() {
+  let approved = 0;
+  let rejected = 0;
+  for (const decision of state.reviews.values()) {
+    if (decision === 'approved') approved += 1;
+    else if (decision === 'rejected') rejected += 1;
   }
+  return {
+    approved,
+    rejected,
+    pending: Math.max(0, state.total - approved - rejected),
+  };
+}
 
-  const ChartCtor = globalThis.Chart;
-  if (typeof ChartCtor === "undefined") {
-    return;
-  }
-
-  const perVideo = [...(state.stats?.per_video ?? [])]
-    .sort((left, right) => right.detection_count - left.detection_count)
-    .slice(0, 6);
-
-  const labels = perVideo.length > 0 ? perVideo.map((item) => formatVideoId(item.video_id)) : ["No Data"];
-  const values = perVideo.length > 0 ? perVideo.map((item) => item.detection_count) : [0];
-
-  if (state.chart) {
-    state.chart.data.labels = labels;
-    state.chart.data.datasets[0].data = values;
-    state.chart.update();
-    return;
-  }
-
-  state.chart = new ChartCtor(chartCanvas, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "الاكتشافات حسب الفيديو",
-          data: values,
-          backgroundColor: "#ffffff",
-          borderRadius: 999,
-          maxBarThickness: 34,
-        },
-      ],
+function compactCartesianScales() {
+  return {
+    x: {
+      beginAtZero: true,
+      ticks: { color: '#666', font: { family: 'Cairo', size: 9 }, precision: 0 },
+      grid: { color: 'rgba(255,255,255,0.035)' },
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-      },
-      scales: {
-        x: {
-          ticks: { color: "#a8a8a8", font: { family: "Cairo", size: 11 } },
-          grid: { display: false },
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { color: "#a8a8a8", precision: 0 },
-          grid: { color: "rgba(255,255,255,0.08)" },
-        },
-      },
+    y: {
+      beginAtZero: true,
+      ticks: { color: '#666', font: { family: 'Cairo', size: 9 }, precision: 0 },
+      grid: { color: 'rgba(255,255,255,0.035)' },
     },
+  };
+}
+
+function formatCoordinates(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "-";
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function formatVideoId(id) {
+  return String(id ?? "").replace(/_/g, " ").toUpperCase();
+}
+
+function isSortableColumn(value) {
+  return (
+    value === "neighborhood" ||
+    value === "videoId" ||
+    value === "timestampSec" ||
+    value === "frameId" ||
+    value === "confidence" ||
+    value === "detectionId" ||
+    value === "coordinates" ||
+    value === "status"
+  );
+}
+
+function getVisibleDetections() {
+  const sortBy = state.listSortBy;
+  if (!sortBy) {
+    return state.detections;
+  }
+  return [...state.detections].sort((left, right) => {
+    let result = 0;
+    if (sortBy === "neighborhood") {
+      result = String(left.neighborhood || UNKNOWN_NEIGHBORHOOD).localeCompare(
+        String(right.neighborhood || UNKNOWN_NEIGHBORHOOD),
+        "ar",
+      );
+    } else if (sortBy === "videoId") {
+      result = String(left.videoId).localeCompare(String(right.videoId));
+    } else if (sortBy === "frameId") {
+      result = Number(left.frameId) - Number(right.frameId);
+    } else if (sortBy === "timestampSec") {
+      result = Number(left.timestampSec) - Number(right.timestampSec);
+    } else if (sortBy === "confidence") {
+      result = Number(left.confidencePct) - Number(right.confidencePct);
+    } else if (sortBy === "detectionId") {
+      result = String(left.id).localeCompare(String(right.id));
+    } else if (sortBy === "coordinates") {
+      result = formatCoordinates(left.lat, left.lng).localeCompare(formatCoordinates(right.lat, right.lng));
+    } else if (sortBy === "status") {
+      result = getReviewStatusLabel(left.id).localeCompare(getReviewStatusLabel(right.id), "ar");
+    }
+    return state.listSortOrder === "asc" ? result : -result;
   });
 }
 
-function renderEmptyState() {
-  setText(totalPinsEl, "0");
-  setText(avgConfidenceEl, "0%");
-  setText(worstHoodEl, "-");
-  if (pinsBody) {
-    pinsBody.innerHTML =
-      '<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 2rem 0;">لا توجد بيانات متاحة.</td></tr>';
-  }
-  if (pageInfoEl) {
-    pageInfoEl.textContent = "";
-  }
-}
-
-function setLoading(isLoading) {
-  if (btnRefresh instanceof HTMLButtonElement) {
-    btnRefresh.disabled = isLoading;
-  }
-}
-
-function setText(element, value) {
-  if (element) {
-    element.textContent = value;
-  }
-}
-
-function setMessage(text, isError) {
-  if (!message) {
-    return;
-  }
-  message.textContent = text;
-  message.classList.toggle("error", Boolean(isError));
-}
-
-function toPercent(value) {
-  return Math.round(Number(value ?? 0) * 100);
+function getReviewStatusLabel(detectionId) {
+  const decision = state.reviews.get(detectionId);
+  if (decision === "approved") return "تم الاعتماد";
+  if (decision === "rejected") return "مستبعد";
+  return "قيد المراجعة";
 }
 
 function formatPercent(value) {
-  if (value === null || value === undefined) {
-    return "0%";
-  }
-  return `${toPercent(value)}%`;
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number)) return "0%";
+  return `${Math.round(number * 100)}%`;
 }
 
-function formatVideoId(videoId) {
-  return String(videoId).replace(/_/g, " ").toUpperCase();
+function formatShare(count, total) {
+  if (!total) return "0%";
+  return `${Math.round((Number(count) / Number(total)) * 100)}%`;
 }
 
-function formatSeconds(value) {
-  const totalSeconds = Number(value ?? 0);
-  if (!Number.isFinite(totalSeconds)) {
-    return "-";
-  }
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+function setLoading(isLoading) { if (btnRefresh) btnRefresh.disabled = isLoading; }
+function setText(el, val) { if (el) el.textContent = val; }
+function setMessage(txt, err) { if (messageEl) { messageEl.textContent = txt; messageEl.style.color = err ? "var(--danger)" : "var(--muted)"; } }
+function formatSeconds(v) { const s = Number(v ?? 0); if (!Number.isFinite(s)) return "-"; return `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2, "0")}`; }
+function escapeHtml(v) { return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }

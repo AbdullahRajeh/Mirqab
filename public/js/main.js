@@ -5,6 +5,9 @@ const DETECTIONS_ENDPOINT = "/api/v1/detections?limit=200&offset=0&sortBy=timest
 const STATS_ENDPOINT = "/api/v1/detections/stats";
 const MAP_ENDPOINT = "/api/v1/detections/map";
 const SESSION_ENDPOINT = "/auth/session";
+const LOGOUT_ENDPOINT = "/auth/logout";
+const NEIGHBORHOOD_CACHE_KEY = "mirqab.neighborhoods.v1";
+const UNKNOWN_NEIGHBORHOOD = "حي غير معروف";
 
 const mapElement = document.getElementById("map");
 const map = mapElement
@@ -27,6 +30,7 @@ const map = mapElement
 const dashboardPanel = document.getElementById("dashboard-panel");
 const openDashBtn = document.getElementById("open-dashboard");
 const uploadBtn = document.getElementById("upload-video");
+const authActionBtn = document.getElementById("auth-action-btn");
 const closeDashBtn = document.getElementById("close-dashboard");
 const refreshButtons = [
   document.getElementById("simulate-ai"),
@@ -51,10 +55,13 @@ const state = {
   detections: [],
   mapPoints: [],
   stats: null,
-  markers: new Map(),
+  popup: null,
+  popupExpanded: false,
+  popupPointId: null,
   chart: null,
   selectedPointId: null,
   pendingFocusId: new URLSearchParams(window.location.search).get("focus"),
+  neighborhoodCache: loadNeighborhoodCache(),
 };
 
 const mapReady = map
@@ -85,21 +92,45 @@ async function checkSession() {
     const response = await fetch(SESSION_ENDPOINT, {
       headers: { Accept: "application/json" },
     });
+    
+    if (authActionBtn) {
+      authActionBtn.hidden = false;
+    }
+
     if (response.ok) {
       const payload = await response.json();
-      if (payload.authenticated && uploadBtn) {
-        uploadBtn.style.display = "block";
+      if (payload.authenticated) {
+        if (uploadBtn) uploadBtn.style.display = "block";
+        if (authActionBtn) {
+          authActionBtn.textContent = "إنهاء الجلسة";
+          authActionBtn.dataset.mode = "logout";
+        }
+      } else {
+        if (authActionBtn) {
+          authActionBtn.textContent = "العودة للرئيسية";
+          authActionBtn.dataset.mode = "back";
+        }
+      }
+    } else {
+      if (authActionBtn) {
+        authActionBtn.textContent = "العودة للرئيسية";
+        authActionBtn.dataset.mode = "back";
       }
     }
   } catch (e) {
     console.error("Session check failed:", e);
+    if (authActionBtn) {
+      authActionBtn.hidden = false;
+      authActionBtn.textContent = "العودة للرئيسية";
+      authActionBtn.dataset.mode = "back";
+    }
   }
 }
 
 function bindUi() {
-  if (openDashBtn && dashboardPanel) {
+  if (openDashBtn) {
     openDashBtn.addEventListener("click", () => {
-      dashboardPanel.classList.add("open");
+      window.location.href = "/dashboard";
     });
   }
 
@@ -117,13 +148,39 @@ function bindUi() {
 
   if (uploadBtn) {
     uploadBtn.addEventListener("click", () => {
-      window.location.href = "/dashboard";
+      window.location.href = "/upload";
+    });
+  }
+
+  if (authActionBtn) {
+    authActionBtn.addEventListener("click", () => {
+      if (authActionBtn.dataset.mode === "logout") {
+        void handleLogout();
+      } else {
+        window.location.href = "/";
+      }
     });
   }
 
   window.focusDetection = (pointId) => {
     focusDetection(pointId);
   };
+}
+
+async function handleLogout() {
+  if (authActionBtn instanceof HTMLButtonElement) {
+    authActionBtn.disabled = true;
+  }
+
+  try {
+    await fetch(LOGOUT_ENDPOINT, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    });
+  } finally {
+    window.location.assign("/login");
+  }
 }
 
 function initSpaceOverlay() {
@@ -190,10 +247,11 @@ async function loadDashboardData({ preserveView }) {
     renderTable();
     renderChart();
     await renderMap({ preserveView });
+    focusPendingDetection();
+    void enrichNeighborhoodNames();
     setupDynamicMask();
 
-    const total = state.stats?.total_detections ?? state.detections.length;
-    setMessage(`تم تحميل ${total} اكتشافاً من الواجهة الخلفية.`, false);
+    setMessage("", false);
   } catch (error) {
     console.error(error);
     setMessage(error.message || "تعذر تحميل بيانات الواجهة الخلفية.", true);
@@ -312,6 +370,8 @@ function normalizeDetections(items) {
     lat: Number(item.gps?.latitude),
     lng: Number(item.gps?.longitude),
     imageUrl: item.image_url,
+    decision: item.review_status,
+    neighborhood: getCachedNeighborhood(Number(item.gps?.latitude), Number(item.gps?.longitude)),
   }));
 }
 
@@ -328,6 +388,8 @@ function normalizeMapPoints(payload) {
       detectionCount: Number(point.detection_count ?? 0),
       confidencePct: toPercent(point.max_confidence),
       imageUrl: point.image_url,
+      decision: point.review_status,
+      neighborhood: getCachedNeighborhood(Number(point.gps?.latitude), Number(point.gps?.longitude)),
     })),
   );
 }
@@ -335,6 +397,7 @@ function normalizeMapPoints(payload) {
 function renderStats() {
   const stats = state.stats;
   if (!stats) { renderEmptyState(); return; }
+  const topNeighborhood = getTopNeighborhood();
   const topVideo = [...(stats.per_video ?? [])].sort((a, b) => b.detection_count - a.detection_count)[0];
   setText(totalPinsEl, String(stats.total_detections ?? 0));
   setText(urgentPinsEl, String(stats.unique_videos ?? 0));
@@ -343,7 +406,7 @@ function renderStats() {
   setText(todayPinsEl, formatPercent(stats.min_confidence));
   setText(weekPinsEl, formatPercent(stats.max_confidence));
   setText(avgResponseTimeEl, String(state.mapPoints.length));
-  setText(worstHoodEl, topVideo ? formatVideoId(topVideo.video_id) : "-");
+  setText(worstHoodEl, topNeighborhood || (topVideo ? formatVideoId(topVideo.video_id) : "-"));
 }
 
 function renderTable() {
@@ -355,7 +418,7 @@ function renderTable() {
   pinsBody.innerHTML = state.detections.map((d) => `
     <tr>
       <td><img src="${d.imageUrl}" class="pin-row__img" onerror="this.src='${FALLBACK_IMAGE}'"></td>
-      <td class="pin-row__hood">${formatVideoId(d.videoId)}</td>
+      <td class="pin-row__hood">${escapeHtml(d.neighborhood || UNKNOWN_NEIGHBORHOOD)}</td>
       <td>
         <div class="pin-row__confidence">
           <div class="pin-row__bar"><div class="pin-row__bar-fill" style="width:${d.confidencePct}%;"></div></div>
@@ -388,23 +451,147 @@ function renderChart() {
 async function renderMap({ preserveView }) {
   if (!map) return;
   await mapReady;
-  state.markers.forEach(m => m.remove());
-  state.markers.clear();
-  if (state.mapPoints.length === 0) return;
-  for (const point of state.mapPoints) {
-    const el = document.createElement("div");
-    el.className = "fancy-marker";
-    el.style.width = el.style.height = `${14 + Math.min(point.detectionCount, 6) * 4}px`;
-    el.style.background = point.confidencePct >= 70 ? "#fb7185" : "#f5f5f5";
-    const popup = new maplibregl.Popup({ offset: 14, closeButton: false, className: "pin-popup-shell" }).setHTML(getPopupHtml(point));
-    const marker = new maplibregl.Marker({ element: el }).setLngLat([point.lng, point.lat]).addTo(map);
-    el.addEventListener("mouseenter", () => popup.setLngLat([point.lng, point.lat]).addTo(map));
-    el.addEventListener("mouseleave", () => popup.remove());
-    el.addEventListener("click", (e) => { e.stopPropagation(); focusDetection(point.id); });
-    marker.popup = popup;
-    state.markers.set(point.id, marker);
+  const data = buildDetectionsGeoJson();
+  if (map.getSource("detection-pins")) {
+    map.getSource("detection-pins").setData(data);
+  } else {
+    map.addSource("detection-pins", { type: "geojson", data });
+    map.addLayer({
+      id: "detection-pin-halo",
+      type: "circle",
+      source: "detection-pins",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 7, 8, 11],
+          14,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 12, 8, 18],
+          18,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 18, 8, 26],
+        ],
+        "circle-color": "#ffffff",
+        "circle-opacity": 0.16,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": 0.24,
+        "circle-stroke-width": 1,
+      },
+    });
+    map.addLayer({
+      id: "detection-pins",
+      type: "circle",
+      source: "detection-pins",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 3.5, 8, 5.5],
+          14,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 5.5, 8, 8],
+          18,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 8, 8, 11],
+        ],
+        "circle-color": "#ffffff",
+        "circle-opacity": 0.96,
+        "circle-stroke-color": "#050505",
+        "circle-stroke-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          1.2,
+          18,
+          2.2,
+        ],
+      },
+    });
+    map.addLayer({
+      id: "detection-pin-counts",
+      type: "symbol",
+      source: "detection-pins",
+      layout: {
+        "text-field": ["get", "countLabel"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 8, 14, 10, 18, 12],
+        "text-allow-overlap": false,
+        "text-ignore-placement": false,
+        "text-anchor": "center",
+        "text-offset": [0, -1.05],
+      },
+      paint: {
+        "text-color": "#050505",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1,
+        "text-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 12, 1],
+      },
+    });
+    bindMapPinInteractions();
   }
+  if (state.mapPoints.length === 0) return;
   if (!preserveView) fitMapToData();
+}
+
+function buildDetectionsGeoJson() {
+  return {
+    type: "FeatureCollection",
+    features: state.mapPoints
+      .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+      .map((point) => ({
+        type: "Feature",
+        id: point.id,
+        geometry: { type: "Point", coordinates: [point.lng, point.lat] },
+        properties: {
+          id: point.id,
+          countLabel: String(Math.min(point.detectionCount, 99)),
+          detectionCount: point.detectionCount,
+        },
+      })),
+  };
+}
+
+function bindMapPinInteractions() {
+  map.on("mouseenter", "detection-pins", (event) => {
+    map.getCanvas().style.cursor = "pointer";
+    const feature = event.features?.[0];
+    const point = feature ? state.mapPoints.find((item) => item.id === feature.properties?.id) : null;
+    if (!point) return;
+    if (state.popupExpanded && state.popupPointId === point.id) return;
+    showPointPopup(point);
+  });
+
+  map.on("mouseleave", "detection-pins", () => {
+    map.getCanvas().style.cursor = "";
+    if (state.popupExpanded) return;
+    state.popup?.remove();
+  });
+
+  map.on("click", "detection-pins", (event) => {
+    const feature = event.features?.[0];
+    const pointId = feature?.properties?.id;
+    if (pointId) focusDetection(pointId);
+  });
+}
+
+function showPointPopup(point, expanded = false) {
+  state.popup?.remove();
+  state.popupExpanded = expanded;
+  state.popupPointId = point.id;
+  state.popup = new maplibregl.Popup({
+    offset: 20,
+    closeButton: false,
+    className: expanded ? "pin-popup-shell pin-popup-shell--expanded" : "pin-popup-shell",
+    maxWidth: expanded ? "420px" : "280px",
+  })
+    .setLngLat([point.lng, point.lat])
+    .setHTML(getPopupHtml(point, expanded))
+    .addTo(map);
+  state.popup.on("close", () => {
+    state.popupExpanded = false;
+    state.popupPointId = null;
+  });
 }
 
 function fitMapToData() {
@@ -417,26 +604,76 @@ function fitMapToData() {
 function focusDetection(id) {
   const p = state.mapPoints.find(i => i.id === id);
   if (!p) return;
-  const m = state.markers.get(id);
-  if (m?.popup) m.popup.setHTML(getPopupHtml(p, true)).setLngLat([p.lng, p.lat]).addTo(map);
+  showPointPopup(p, true);
   map.flyTo({ center: [p.lng, p.lat], zoom: 15.5, pitch: 58, duration: 1400 });
 }
 
+function focusPendingDetection() {
+  if (!state.pendingFocusId) return;
+  const pointId = state.pendingFocusId;
+  state.pendingFocusId = null;
+  window.setTimeout(() => {
+    focusDetection(pointId);
+  }, 250);
+}
+
 function getPopupHtml(p, expanded = false) {
-  return `
-    <div class="pin-popup ${expanded ? "pin-popup--expanded" : ""}" dir="rtl">
-      <div class="pin-popup__head">
-        <span class="pin-popup__confidence">${p.confidencePct}% ثقة</span>
-        <strong>${formatVideoId(p.videoId)}</strong>
+  const severity = getSeverityLabel(p.confidencePct);
+  
+  if (expanded) {
+    return `
+      <div class="pin-popup-elegant pin-popup-elegant--expanded" dir="rtl">
+        <img src="${p.imageUrl}" class="popup-img popup-img--expanded" alt="" onerror="this.src='${FALLBACK_IMAGE}'">
+        <div class="popup-info popup-info--expanded">
+          <div>
+            <strong class="popup-hood">${escapeHtml(p.neighborhood || UNKNOWN_NEIGHBORHOOD)}</strong>
+            <div class="popup-id">${formatVideoId(p.videoId)} / FRAME_${p.frameId}</div>
+          </div>
+          <div class="popup-confidence">
+            <div class="popup-confidence__head">
+              <span>مستوى الثقة</span>
+              <strong>${p.confidencePct}%</strong>
+            </div>
+            <div class="popup-confidence__bar"><span style="width:${p.confidencePct}%;"></span></div>
+          </div>
+          <div class="popup-details">
+            <span>الأولوية</span>
+            <strong>${severity}</strong>
+            <span>الاكتشافات</span>
+            <strong>${p.detectionCount}</strong>
+            <span>التوقيت</span>
+            <strong>${formatSeconds(p.timestampSec)}</strong>
+            <span>الإحداثيات</span>
+            <strong dir="ltr">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</strong>
+          </div>
+        </div>
       </div>
-      <img src="${p.imageUrl}" class="pin-popup__image ${expanded ? "is-expanded" : ""}" onerror="this.src='${FALLBACK_IMAGE}'">
-      <div class="pin-popup__meta">
-        <p><span>الإطار</span> ${p.frameId}</p>
-        <p><span>الوقت</span> ${formatSeconds(p.timestampSec)}</p>
-        <p><span>الاكتشافات</span> ${p.detectionCount}</p>
+    `;
+  }
+
+  return `
+    <div class="pin-popup-elegant" dir="rtl">
+      <img src="${p.imageUrl}" class="popup-img" alt="" onerror="this.src='${FALLBACK_IMAGE}'">
+      <div class="popup-info">
+        <strong class="popup-hood">${escapeHtml(p.neighborhood || UNKNOWN_NEIGHBORHOOD)}</strong>
+        <div class="popup-stats">
+          <span>${p.confidencePct}% ثقة</span>
+          <span class="popup-sep">/</span>
+          <span>${severity}</span>
+          <span class="popup-sep">/</span>
+          <span>${p.detectionCount} اكتشاف</span>
+          <span class="popup-sep">/</span>
+          <span>${formatSeconds(p.timestampSec)}</span>
+        </div>
       </div>
     </div>
   `;
+}
+
+function getSeverityLabel(confidencePct) {
+  if (confidencePct >= 80) return "أولوية عالية";
+  if (confidencePct >= 50) return "أولوية متوسطة";
+  return "أولوية منخفضة";
 }
 
 function renderEmptyState() {
@@ -454,4 +691,151 @@ function formatSeconds(v) {
   const s = Number(v ?? 0);
   if (!Number.isFinite(s)) return "-";
   return `${Math.floor(s/60)}:${Math.round(s%60).toString().padStart(2, "0")}`;
+}
+
+function loadNeighborhoodCache() {
+  try {
+    return JSON.parse(localStorage.getItem(NEIGHBORHOOD_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveNeighborhoodCache() {
+  try {
+    localStorage.setItem(NEIGHBORHOOD_CACHE_KEY, JSON.stringify(state.neighborhoodCache));
+  } catch {
+    // Cache is an enhancement only.
+  }
+}
+
+function coordinateKey(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return "";
+  }
+  return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+}
+
+function getCachedNeighborhood(lat, lng) {
+  const key = coordinateKey(lat, lng);
+  return key ? state.neighborhoodCache[key] || "" : "";
+}
+
+async function enrichNeighborhoodNames() {
+  const uniquePoints = [];
+  const seen = new Set();
+
+  for (const point of state.mapPoints) {
+    const key = coordinateKey(point.lat, point.lng);
+    if (!key || seen.has(key) || state.neighborhoodCache[key]) {
+      continue;
+    }
+    seen.add(key);
+    uniquePoints.push({ key, lat: point.lat, lng: point.lng });
+  }
+
+  for (const point of uniquePoints) {
+    const neighborhood = await reverseGeocodeNeighborhood(point.lat, point.lng);
+    state.neighborhoodCache[point.key] = neighborhood;
+    saveNeighborhoodCache();
+    applyNeighborhood(point.key, neighborhood);
+    renderStats();
+    renderTable();
+    updateMarkerPopup(point.key);
+    await sleep(1100);
+  }
+}
+
+async function reverseGeocodeNeighborhood(lat, lng) {
+  try {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      lat: String(lat),
+      lon: String(lng),
+      zoom: "14",
+      addressdetails: "1",
+      "accept-language": "ar",
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return UNKNOWN_NEIGHBORHOOD;
+    }
+    const payload = await response.json();
+    const address = payload.address || {};
+    return (
+      address.neighbourhood ||
+      address.suburb ||
+      address.quarter ||
+      address.city_district ||
+      address.district ||
+      address.village ||
+      address.town ||
+      address.city ||
+      address.county ||
+      UNKNOWN_NEIGHBORHOOD
+    );
+  } catch {
+    return UNKNOWN_NEIGHBORHOOD;
+  }
+}
+
+function applyNeighborhood(key, neighborhood) {
+  for (const point of state.mapPoints) {
+    if (coordinateKey(point.lat, point.lng) === key) {
+      point.neighborhood = neighborhood;
+    }
+  }
+  for (const detection of state.detections) {
+    if (coordinateKey(detection.lat, detection.lng) === key) {
+      detection.neighborhood = neighborhood;
+    }
+  }
+}
+
+function updateMarkerPopup(key) {
+  const point = state.mapPoints.find((item) => coordinateKey(item.lat, item.lng) === key);
+  if (!point) {
+    return;
+  }
+  if (state.popup?.isOpen()) {
+    state.popup.setHTML(getPopupHtml(point, state.popupExpanded));
+  }
+}
+
+function getTopNeighborhood() {
+  const counts = new Map();
+  for (const point of state.mapPoints) {
+    const name = point.neighborhood;
+    if (!name || name === UNKNOWN_NEIGHBORHOOD) {
+      continue;
+    }
+    counts.set(name, (counts.get(name) || 0) + Number(point.detectionCount || 1));
+  }
+
+  let top = "";
+  let topCount = 0;
+  for (const [name, count] of counts.entries()) {
+    if (count > topCount) {
+      top = name;
+      topCount = count;
+    }
+  }
+  return top;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }

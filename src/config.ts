@@ -33,4 +33,5 @@ export const config = {
     process.env.SAMPLE_DATA_PATH ?? path.join(process.cwd(), "data", "detections.sample.json"),
   frontendPublicPath: path.join(process.cwd(), "public"),
   dashboardPagePath: path.join(process.cwd(), "dashboard.html"),
+  uploadPagePath: path.join(process.cwd(), "upload.html"),
 };

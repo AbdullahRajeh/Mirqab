@@ -30,36 +30,39 @@ type AppOverrides = {
 
 function buildDependencies(overrides: AppOverrides = {}): {
   service: DetectionServiceContract;
+  repository: DetectionRepositoryContract;
   dynamicRepo: DynamicDetectionRepository | null;
 } {
   if (overrides.service) {
-    return { service: overrides.service, dynamicRepo: null };
+    const repo = overrides.repository ?? new SampleDetectionRepository(config.sampleDataPath);
+    return { service: overrides.service, repository: repo, dynamicRepo: null };
   }
 
   if (overrides.repository) {
     const service = new DetectionService(overrides.repository, config.mediaBaseUrl);
-    return { service, dynamicRepo: null };
+    return { service, repository: overrides.repository, dynamicRepo: null };
   }
 
   if (config.databaseUrl) {
     const repository = new DetectionRepository(overrides.pool ?? getPool());
     const service = new DetectionService(repository, config.mediaBaseUrl);
-    return { service, dynamicRepo: null };
+    return { service, repository, dynamicRepo: null };
   }
 
   const inner = new SampleDetectionRepository(config.sampleDataPath);
   const dynamicRepo = new DynamicDetectionRepository(inner);
   const service = new DetectionService(dynamicRepo, config.mediaBaseUrl);
-  return { service, dynamicRepo };
+  return { service, repository: dynamicRepo, dynamicRepo };
 }
 
 export function createApp(overrides: AppOverrides = {}): express.Express {
-  const { service, dynamicRepo } = buildDependencies(overrides);
+  const { service, repository, dynamicRepo } = buildDependencies(overrides);
   const detectionsController = createDetectionsController(service);
   const mockWorkflowController = createMockWorkflowController(getMockWorkflowStore());
   const pipelineWorkflowController = createPipelineWorkflowController(
     getPipelineWorkflowStore(process.cwd()),
     dynamicRepo,
+    repository,
     config.mediaBaseUrl,
   );
   const healthController = createHealthController();
@@ -96,8 +99,11 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
   app.get("/map", (_req, res) => {
     res.sendFile(path.join(config.frontendPublicPath, "map.html"));
   });
-  app.get("/dashboard", requireAdminPage, (_req, res) => {
+  app.get("/dashboard", (_req, res) => {
     res.sendFile(config.dashboardPagePath);
+  });
+  app.get("/upload", requireAdminPage, (_req, res) => {
+    res.sendFile(config.uploadPagePath);
   });
 
   app.use(
@@ -112,6 +118,9 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
   app.use(
     "/media",
     express.static(config.mediaRootPath, {
+      fallthrough: true,
+    }),
+    express.static(path.join(process.cwd(), "pipeline"), {
       fallthrough: true,
     }),
   );

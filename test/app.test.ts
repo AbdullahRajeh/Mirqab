@@ -186,15 +186,16 @@ test("GET /health returns ok", async () => {
   const app = createTestApp();
   const response = await request(app).get("/health");
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, { status: "ok" });
+  assert.equal(response.body.status, "ok");
+  assert.ok(["missing", "lfs_pointer", "ready"].includes(response.body.pipeline?.model));
 });
 
-test("GET /dashboard redirects to /login when unauthenticated", async () => {
+test("GET /dashboard is public for unauthenticated viewers", async () => {
   const app = createTestApp();
   const response = await request(app).get("/dashboard");
 
-  assert.equal(response.statusCode, 302);
-  assert.equal(response.headers.location, "/login");
+  assert.equal(response.statusCode, 200);
+  assert.match(response.text, /MIRQAB/);
 });
 
 test("GET /api/v1/detections is now public", async () => {

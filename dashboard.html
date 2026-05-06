@@ -3,191 +3,273 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MIRQAB / DASHBOARD</title>
+    <title>MIRQAB / 04 / MONITORING_HUB</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;900&family=Changa:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Changa:wght@400;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/main.css" />
     <link rel="stylesheet" href="/css/dashboard.css" />
   </head>
-  <body class="dashboard-root">
+  <body class="command-center">
     <div class="shutter" id="shutter"></div>
-    <div class="bg-layers">
-      <div class="bg-grid"></div>
-      <div class="bg-dots"></div>
-      <div class="bg-noise"></div>
+    
+    <div class="canvas">
+      <div class="canvas-lines"></div>
+      <div class="canvas-noise"></div>
     </div>
-
-    <main class="dashboard-page">
-      <header class="dashboard-page-head">
-        <div class="head-left">
-          <div class="id-mark">MIRQAB // OPS_COMMAND</div>
-          <h1>لوحة التحليلات</h1>
+    
+    <div class="dashboard-wrapper">
+      <!-- Top Level Navigation & Clock -->
+      <header class="hub-header">
+        <div class="header-main">
+          <div class="id-mark">MIRQAB // OPS_COMMAND // L04</div>
+          <h1>مركز الرقابة والتحليل اللحظي</h1>
         </div>
-        <div class="dashboard-page-toolbar">
-          <a href="/map" class="btn-nav" aria-label="العودة إلى الخريطة">
-            <span class="icon">←</span>
-            <span class="text">عودة للخريطة</span>
-          </a>
-          <button id="logout-button" type="button" class="btn-danger">إنهاء الجلسة</button>
+        <div class="header-meta">
+          <div class="scope-chip">النطاق: <span id="stats-scope">كل المصادر</span></div>
+          <div class="nav-links">
+            <a href="/map" class="nav-link-minimal">الخريطة المركزية</a>
+          </div>
         </div>
       </header>
 
-      <p id="message" class="dashboard-page-message message" aria-live="polite"></p>
-
-      <section class="dashboard-kpis">
-        <div class="dashboard-kpi">
-          <span class="kpi-label">إجمالي العيوب</span>
-          <span id="total-pins" class="kpi-value">0</span>
+      <!-- Section 1: Strategic Telemetry -->
+      <section class="telemetry-grid">
+        <div class="telemetry-tile">
+          <span class="tile-label">إجمالي البلاغات</span>
+          <span id="total-pins" class="tile-value mono">0</span>
+          <span class="tile-hint">كل الحفر المكتشفة ضمن النطاق الحالي</span>
         </div>
-        <div class="dashboard-kpi">
-          <span class="kpi-label">أكثر فيديو اكتشافاً</span>
-          <span id="worst-hood" class="kpi-value text-accent">-</span>
+        <div class="telemetry-tile">
+          <span class="tile-label">نقاط الخريطة</span>
+          <span id="map-points" class="tile-value mono">0</span>
+          <span class="tile-hint">دبابيس GPS المجمعة على الخريطة</span>
         </div>
-        <div class="dashboard-kpi">
-          <span class="kpi-label">متوسط الثقة</span>
-          <span id="avg-confidence" class="kpi-value text-accent">0%</span>
+        <div class="telemetry-tile">
+          <span class="tile-label">الأحياء المشمولة</span>
+          <span id="total-hoods" class="tile-value mono">0</span>
+          <span class="tile-hint">عدد المواقع التي تم تحديد أسمائها</span>
         </div>
-      </section>
-
-      <section class="dashboard-tools">
-        <div class="tools-head">
-          <div class="section-title">
-            <span class="eyebrow">أدوات التحكم</span>
-            <h2>إدارة البيانات والرفع</h2>
-          </div>
-          <button id="btn-refresh" type="button" class="btn-technical">تحديث البيانات</button>
+        <div class="telemetry-tile">
+          <span class="tile-label">الفيديوهات</span>
+          <span id="total-videos" class="tile-value mono">0</span>
+          <span class="tile-hint">مصادر الفيديو ضمن التصفية الحالية</span>
         </div>
-
-        <div class="tools-layout">
-          <div class="tools-section">
-            <h3 class="tools-subtitle">فلترة الجدول</h3>
-            <div class="filter-controls">
-              <div class="control-item">
-                <label for="video-filter">الفيديو</label>
-                <select id="video-filter" class="tech-select"><option value="">الكل</option></select>
-              </div>
-              <div class="control-item">
-                <label for="page-size">الصفوف</label>
-                <select id="page-size" class="tech-select">
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="200" selected>200</option>
-                </select>
-              </div>
-              <div class="control-item">
-                <label for="sort-by">ترتيب حسب</label>
-                <select id="sort-by" class="tech-select">
-                  <option value="timestampSec">الوقت</option>
-                  <option value="confidence">الثقة</option>
-                  <option value="videoId">الفيديو</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="tools-section upload-zone">
-            <h3 class="tools-subtitle">رفع فيديو جديد</h3>
-            <input id="upload-input" type="file" accept="video/*" class="hidden-input" />
-            <div class="upload-actions">
-              <button id="upload-trigger" type="button" class="btn-upload">اختيار الملف</button>
-              <span id="upload-filename" class="upload-filename">لم يُختر ملف</span>
-            </div>
-            <div class="upload-config">
-              <label for="skip-frames-input">تخطي الإطارات:</label>
-              <input id="skip-frames-input" type="number" min="1" max="120" value="30" />
-            </div>
-            <div id="upload-progress-wrap" class="upload-progress-wrap" hidden>
-              <div class="progress-track"><div id="upload-progress-bar" class="progress-fill"></div></div>
-              <span id="upload-status-text" class="upload-status"></span>
-            </div>
-          </div>
+        <div class="telemetry-tile">
+          <span class="tile-label">الإطارات</span>
+          <span id="total-frames" class="tile-value mono">0</span>
+          <span class="tile-hint">إطارات فريدة تحتوي على اكتشافات</span>
+        </div>
+        <div class="telemetry-tile">
+          <span class="tile-label">متوسط الثقة</span>
+          <span id="avg-confidence" class="tile-value mono">0%</span>
+          <span class="tile-hint">متوسط ثقة نموذج الرصد</span>
+        </div>
+        <div class="telemetry-tile highlight">
+          <span class="tile-label">أعلى ثقة مرصودة</span>
+          <span id="max-confidence" class="tile-value mono">0%</span>
+          <span class="tile-hint">أفضل نتيجة رصد في النطاق</span>
+        </div>
+        <div class="telemetry-tile low-signal">
+          <span class="tile-label">أدنى ثقة مرصودة</span>
+          <span id="min-confidence" class="tile-value mono">0%</span>
+          <span class="tile-hint">أضعف نتيجة تحتاج تدقيقاً</span>
+        </div>
+        <div class="telemetry-tile">
+          <span class="tile-label">عالية الثقة</span>
+          <span id="high-confidence-count" class="tile-value mono">0</span>
+          <span class="tile-hint">بلاغات بثقة 80% فأعلى</span>
+        </div>
+        <div class="telemetry-tile">
+          <span class="tile-label">قيد المراجعة</span>
+          <span id="pending-count" class="tile-value mono">0</span>
+          <span class="tile-hint">بلاغات لم تعتمد أو تستبعد بعد</span>
+        </div>
+        <div class="telemetry-tile">
+          <span class="tile-label">معتمدة / مستبعدة</span>
+          <span class="tile-value mono"><span id="approved-count">0</span>/<span id="rejected-count">0</span></span>
+          <span class="tile-hint">نتائج قرارات المراجعة اليدوية</span>
         </div>
       </section>
 
-      <div class="dashboard-main-area">
-        <div class="data-column">
-          <section class="chart-section tech-panel">
-            <div class="panel-head">
-              <h3>توزيع الاكتشافات</h3>
-              <span class="panel-sub">أعلى المصادر</span>
-            </div>
-            <div class="chart-container">
-              <canvas id="severityChart"></canvas>
-            </div>
-          </section>
-
-          <section class="table-section tech-panel">
-            <div class="panel-head">
-              <h3>سجل الاكتشافات</h3>
-              <div class="pagination">
-                <span id="page-info"></span>
-                <button id="btn-prev-page" class="btn-arrow">↑</button>
-                <button id="btn-next-page" class="btn-arrow">↓</button>
-              </div>
-            </div>
-            <div class="table-container">
-              <table id="pins-table">
-                <thead>
-                  <tr>
-                    <th>الصورة</th>
-                    <th>الفيديو</th>
-                    <th>الإطار</th>
-                    <th>الوقت</th>
-                    <th>الثقة</th>
-                    <th>المراجعة</th>
-                    <th>عرض</th>
-                  </tr>
-                </thead>
-                <tbody id="pins-body"></tbody>
-              </table>
-            </div>
-          </section>
+      <!-- Section 2: Advanced Analytical Diagrams -->
+      <section class="diagrams-grid">
+        <div class="diagram-box large">
+          <div class="diagram-head">
+            <span class="tag">TEMPORAL_ANALYSIS</span>
+            <h3>توزيع الثقة عبر الخط الزمني للفيديو</h3>
+          </div>
+          <div class="chart-stage">
+            <canvas id="timeConfidenceChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="diagram-box">
+          <div class="diagram-head">
+            <span class="tag">GEOSPATIAL_RANKING</span>
+            <h3>ترتيب كثافة البلاغات حسب الأحياء</h3>
+          </div>
+          <div class="chart-stage">
+            <canvas id="hoodDensityChart"></canvas>
+          </div>
         </div>
 
-        <aside class="review-panel tech-panel">
-          <div class="panel-head">
-            <h3>مراجعة الاكتشاف</h3>
-            <p id="review-queue-hint" class="panel-sub"></p>
+        <div class="diagram-box">
+          <div class="diagram-head">
+            <span class="tag">QUALITY_DISTRIBUTION</span>
+            <h3>دقة المصادر المرفوعة</h3>
           </div>
-          <div class="review-content">
-            <div class="preview-box">
-              <button id="review-image-trigger" class="btn-zoom" hidden>
-                <img id="review-image" src="" alt="معاينة" />
+          <div class="chart-stage">
+            <canvas id="sourceQualityChart"></canvas>
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <div class="diagram-head">
+            <span class="tag">OPERATIONAL_LOAD</span>
+            <h3>إنتاجية مراجعة النظام</h3>
+          </div>
+          <div class="chart-stage">
+            <canvas id="reviewStatusChart"></canvas>
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <div class="diagram-head">
+            <span class="tag">CONFIDENCE_BUCKETS</span>
+            <h3>تصنيف الثقة</h3>
+          </div>
+          <div class="chart-stage">
+            <canvas id="confidenceDistChart"></canvas>
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <div class="diagram-head">
+            <span class="tag">SOURCE_DENSITY</span>
+            <h3>كثافة البلاغات لكل مصدر</h3>
+          </div>
+          <div class="chart-stage">
+            <canvas id="sourceDensityChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Visible Hotspot Intelligence -->
+      <section class="hotspots-section">
+        <div class="hotspots-head">
+          <div class="title-group">
+            <span class="tag">SCOPE_INTELLIGENCE</span>
+            <h3>ملخص النطاق الجغرافي والمصادر</h3>
+          </div>
+          <div class="worst-summary">أعلى منطقة: <span id="worst-hood" class="mono">-</span></div>
+        </div>
+        <div class="hotspot-panels">
+          <div class="hotspot-lead">
+            <div class="hotspot-kicker">النقاط الأعلى كثافة</div>
+            <div id="hotspot-summary" class="hotspot-summary">
+              <span class="muted">جاري تحليل المواقع...</span>
+            </div>
+          </div>
+          <div class="hotspot-rank-panel">
+            <div class="mini-section-title">ترتيب الأحياء</div>
+            <div id="hood-list" class="hotspot-grid"></div>
+          </div>
+          <div class="source-rank-panel">
+            <div class="mini-section-title">المصادر</div>
+            <div id="source-list" class="source-stat-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Tactical Data Center -->
+      <div class="tactical-layout">
+        <!-- Main Data Stream -->
+        <main class="data-stream">
+          <div class="stream-header">
+            <div class="title-meta">
+              <h3>سجل الرصد اللحظي</h3>
+              <span id="page-info" class="mono">0-0 // 0</span>
+            </div>
+            <div class="stream-tools">
+              <select id="video-filter" class="technical-select"><option value="">كل المصادر</option></select>
+              <button id="btn-refresh" class="btn-technical">تحديث البيانات</button>
+            </div>
+          </div>
+
+          <div class="grid-container">
+            <table id="pins-table">
+              <thead>
+                <tr>
+                  <th><button type="button" class="sort-header" data-sort="detectionId">المعاينة</button></th>
+                  <th><button type="button" class="sort-header" data-sort="neighborhood">الحي</button></th>
+                  <th><button type="button" class="sort-header" data-sort="videoId">المصدر</button></th>
+                  <th><button type="button" class="sort-header" data-sort="frameId">الإطار</button></th>
+                  <th><button type="button" class="sort-header" data-sort="timestampSec">الوقت</button></th>
+                  <th><button type="button" class="sort-header" data-sort="confidence">نسبة الثقة</button></th>
+                  <th><button type="button" class="sort-header" data-sort="coordinates">الإحداثيات</button></th>
+                  <th><button type="button" class="sort-header" data-sort="status">الحالة</button></th>
+                </tr>
+              </thead>
+              <tbody id="pins-body"></tbody>
+            </table>
+          </div>
+
+          <div class="stream-footer">
+            <span class="stream-note">يعرض السجل أحدث 200 بلاغ ضمن النطاق المحدد.</span>
+          </div>
+        </main>
+
+        <!-- Inspection Monitor -->
+        <aside class="inspection-monitor">
+          <div class="monitor-frame">
+            <div class="monitor-header">
+              <span class="mono">INSPECTION_UNIT // LIVE_FEED</span>
+            </div>
+            <div class="monitor-display">
+              <button id="review-image-trigger" class="zoom-action" hidden>
+                <img id="review-image" src="" alt="Detail" />
               </button>
-              <div id="review-empty">اختر صفاً للمراجعة</div>
+              <div id="review-empty" class="monitor-placeholder">جاري انتظار مدخلات النظام...</div>
             </div>
-            <dl id="review-meta" class="review-meta"></dl>
-            <div class="review-actions">
-              <button id="btn-approve" class="btn-approve">موافقة</button>
-              <button id="btn-reject" class="btn-reject">رفض</button>
+
+            <div id="review-meta" class="monitor-readout"></div>
+
+            <div class="monitor-controls">
+              <button id="btn-approve" class="btn-confirm">اعتماد</button>
+              <button id="btn-reject" class="btn-reject">استبعاد</button>
             </div>
-            <div class="review-nav">
-              <button id="btn-review-prev" class="btn-nav-small">← السابق</button>
-              <button id="btn-review-next" class="btn-nav-small">التالي →</button>
+            <div id="review-guest-note" class="review-guest-note" hidden>
+              وضع العرض فقط. تسجيل دخول المشرف مطلوب للاعتماد أو الاستبعاد.
             </div>
-            <a id="map-link" class="link-map" href="#" hidden>فتح الموقع على الخريطة</a>
           </div>
         </aside>
       </div>
-    </main>
 
-    <div id="image-viewer" class="tech-modal" hidden>
-      <div id="image-viewer-backdrop" class="modal-backdrop"></div>
+      <footer class="hub-footer">
+        <div class="footer-segment">SYSTEM_ENCRYPTION: ACTIVE</div>
+        <div id="message" class="footer-segment system-msg"></div>
+        <div class="footer-segment">© 2026 MIRQAB SYSTEMS</div>
+      </footer>
+    </div>
+
+    <!-- High Fidelity Detail Modal -->
+    <div id="image-viewer" class="hud-modal" hidden>
+      <div id="image-viewer-backdrop" class="modal-dim"></div>
       <div class="modal-content">
-        <div class="modal-toolbar">
-          <strong>معاينة الإطار</strong>
-          <div class="modal-controls">
+        <div class="modal-header">
+          <span class="mono">ANALYSIS_MODE // HIGH_RES_INPUT</span>
+          <div class="modal-tools">
             <button id="image-viewer-zoom-out">-</button>
-            <span id="image-viewer-zoom-value">100%</span>
+            <span id="image-viewer-zoom-value" class="mono">100%</span>
             <button id="image-viewer-zoom-in">+</button>
             <button id="image-viewer-close">إغلاق</button>
           </div>
         </div>
-        <div id="image-viewer-stage" class="modal-stage">
+        <div id="image-viewer-stage" class="modal-body">
           <img id="image-viewer-image" src="" alt="" />
         </div>
       </div>
@@ -208,9 +290,9 @@
             shutter.classList.remove('dismiss');
             shutter.style.transform = 'translateY(100%)';
             shutter.offsetHeight;
-            shutter.style.transition = 'transform 0.6s cubic-bezier(0.19, 1, 0.22, 1)';
+            shutter.style.transition = 'transform 0.4s cubic-bezier(0.19, 1, 0.22, 1)';
             shutter.style.transform = 'translateY(0)';
-            setTimeout(() => window.location.href = href, 400);
+            setTimeout(() => window.location.href = href, 350);
           });
         });
       });

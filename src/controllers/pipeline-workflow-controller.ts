@@ -3,9 +3,10 @@ import path from "node:path";
 import fs from "node:fs";
 import type { Request, Response, NextFunction } from "express";
 import { HttpError } from "../utils/http-error";
-import type { PipelineWorkflowStore } from "../services/pipeline-workflow-store";
+import { assertModelFileReady, type PipelineWorkflowStore } from "../services/pipeline-workflow-store";
 import type { DynamicDetectionRepository } from "../repositories/dynamic-detection-repository";
 import { SampleDetectionRepository } from "../repositories/sample-detection-repository";
+import type { DetectionRepositoryContract } from "../repositories/detection-repository";
 
 
 const ALLOWED_EXTENSIONS = new Set([".mp4", ".mov", ".avi", ".mkv", ".webm"]);
@@ -21,6 +22,7 @@ function buildUploadDir(projectRoot: string): string {
 export function createPipelineWorkflowController(
   store: PipelineWorkflowStore,
   dynamicRepo: DynamicDetectionRepository | null,
+  repository: DetectionRepositoryContract,
   _mediaBaseUrl: string,
 ): {
   uploadMiddleware: ReturnType<typeof multer>["single"];
@@ -46,18 +48,44 @@ export function createPipelineWorkflowController(
       if (ALLOWED_EXTENSIONS.has(ext)) {
         cb(null, true);
       } else {
-        cb(new Error(`Unsupported file type: ${ext}`));
+        cb(new HttpError(400, "unsupported_format", `Unsupported file type: ${ext}`));
       }
     },
   });
 
   return {
-    uploadMiddleware: upload.single.bind(upload),
+    uploadMiddleware: (fieldName: string) => {
+      const middleware = upload.single(fieldName);
+      return (req: Request, res: Response, next: NextFunction) => {
+        middleware(req, res, (err: any) => {
+          if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return next(new HttpError(400, "file_too_large", "File size exceeds 4GB limit"));
+            }
+            if (err instanceof HttpError) {
+              return next(err);
+            }
+            return next(new HttpError(400, "upload_error", err.message || "Upload failed"));
+          }
+          next();
+        });
+      };
+    },
 
     async uploadVideo(req: Request, res: Response, next: NextFunction): Promise<void> {
       if (!req.file) {
         throw new HttpError(400, "missing_file", "No video file provided");
       }
+
+      const modelPath = path.join(projectRoot, "pipeline", "models", "best.pt");
+      try {
+        await assertModelFileReady(modelPath);
+      } catch (error) {
+        await fs.promises.unlink(req.file.path).catch(() => undefined);
+        const message = error instanceof Error ? error.message : "Pipeline model is not ready";
+        throw new HttpError(503, "pipeline_model_not_ready", message);
+      }
+
       const rawSkip = req.body?.skipFrames;
       const skipFrames = Math.max(1, Math.min(120, Number.parseInt(String(rawSkip ?? "10"), 10) || 10));
       const job = store.createJob(req.file.originalname, req.file.path, skipFrames);
@@ -80,15 +108,22 @@ export function createPipelineWorkflowController(
         throw new HttpError(404, "upload_not_found", "Upload not found");
       }
 
-      // When the pipeline finishes, hot-swap the repository so the dashboard
-      // shows the new run's data without a server restart.
-      if (job.status === "complete" && job.detectionsPath && dynamicRepo && !job._swapped) {
+      // When the pipeline finishes, hot-swap the repository OR import into DB
+      if (job.status === "complete" && job.detectionsPath && !job._swapped) {
         try {
-          const newRepo = new SampleDetectionRepository(job.detectionsPath);
-          dynamicRepo.swap(newRepo);
+          const raw = fs.readFileSync(job.detectionsPath, "utf8");
+          const detections = JSON.parse(raw);
+
+          if (dynamicRepo) {
+            const newRepo = new SampleDetectionRepository(job.detectionsPath);
+            dynamicRepo.swap(newRepo);
+          } else if (typeof (repository as any).importDetections === 'function') {
+            // Import into Postgres
+            await (repository as any).importDetections(detections);
+          }
           job._swapped = true;
-        } catch {
-          // If swap fails (e.g. file not yet flushed), ignore — next poll will retry
+        } catch (err) {
+          console.error("Failed to import/swap detections:", err);
         }
       }
 

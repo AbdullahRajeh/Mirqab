@@ -12,24 +12,39 @@
     />
     <link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet" />
     <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/map.css" />
   </head>
   <body>
     <div id="map" class="map" dir="ltr" role="application" aria-label="Riyadh map"></div>
     <canvas id="space-overlay" class="space-overlay" aria-hidden="true"></canvas>
 
-    <section class="overlay" aria-label="Coordinate controls">
-      <div class="brand-text">
-        <img src="assets/logo.svg" alt="MIRQAB" class="brand-logo" aria-hidden="true" />
+    <nav class="map-nav" aria-label="Main Navigation">
+      <div class="nav-brand">
+        <div class="nav-title">
+          <p class="nav-eyebrow">MIRQAB</p>
+          <h1>مراقبة عيوب الطرق</h1>
+        </div>
       </div>
 
-      <div class="actions">
-        <button type="button" id="upload-video" class="action-primary" style="display: none;">رفع فيديو جديد</button>
-        <button type="button" id="simulate-ai" class="action-secondary">تحديث البيانات</button>
-        <button type="button" id="open-dashboard" class="dashboard-link">فتح لوحة التحليلات</button>
+      <div class="nav-actions">
+        <button type="button" id="upload-video" class="btn-primary" style="display: none;">رفع فيديو جديد</button>
+        <button type="button" id="open-dashboard" class="btn-secondary">لوحة التحليلات</button>
+        <button type="button" id="simulate-ai" class="btn-icon-refresh" aria-label="تحديث البيانات" title="تحديث البيانات">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
       </div>
+    </nav>
 
+    <div class="top-left-actions">
+      <button type="button" id="auth-action-btn" class="btn-spliced-action" hidden>العودة للرئيسية</button>
+    </div>
+
+    <div class="status-message-container">
       <p id="message" class="message" aria-live="polite"></p>
-    </section>
+    </div>
 
     <!-- Slide-in Dashboard -->
     <aside id="dashboard-panel" class="dashboard-panel">
@@ -105,14 +120,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module" src="js/main.js"></script>
-    <script>
-      window.addEventListener('DOMContentLoaded', () => {
-        const shutter = document.getElementById('shutter');
-        setTimeout(() => {
-          shutter.classList.add('dismiss');
-        }, 50);
-      });
-    </script>
   </body>
 
 </html>
