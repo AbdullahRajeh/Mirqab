@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
-export type PipelineJobStatus = "queued" | "inference" | "complete" | "failed";
+export type PipelineJobStatus = "queued" | "inference" | "gps" | "complete" | "failed";
 
 export type PipelineJob = {
   uploadId: string;
@@ -24,12 +24,14 @@ function randomSuffix(): string {
 export function buildPipelineCommand(projectRoot: string, job: PipelineJob, skipFrames: number): {
   command: string;
   args: string[];
+  runDir: string;
   detectionsPath: string;
 } {
   const pipelineRoot = path.join(projectRoot, "pipeline");
   const scriptPath = path.join(pipelineRoot, "scripts", "inference.py");
   const modelPath = path.join(pipelineRoot, "models", "best.pt");
-  const detectionsPath = path.join(pipelineRoot, "runs", "inference", job.runName, "detections.json");
+  const runDir = path.join(pipelineRoot, "runs", "inference", job.runName);
+  const detectionsPath = path.join(runDir, "detections.json");
   const command = process.env.PYTHON_BIN ?? "python";
 
   return {
@@ -45,7 +47,18 @@ export function buildPipelineCommand(projectRoot: string, job: PipelineJob, skip
       "--skip-frames",
       String(skipFrames),
     ],
+    runDir,
     detectionsPath,
+  };
+}
+
+export function buildOcrCommand(projectRoot: string, runDir: string): { command: string; args: string[] } {
+  const scriptPath = path.join(projectRoot, "pipeline", "scripts", "ocr_gps.py");
+  const command = process.env.PYTHON_BIN ?? "python";
+
+  return {
+    command,
+    args: [scriptPath, "--run", runDir],
   };
 }
 
@@ -118,53 +131,76 @@ class PipelineWorkflowStoreImpl {
     job.progress = 0;
 
     try {
-      const { command, args, detectionsPath } = buildPipelineCommand(this.projectRoot, job, skipFrames);
+      const { command, args, runDir, detectionsPath } = buildPipelineCommand(
+        this.projectRoot,
+        job,
+        skipFrames,
+      );
 
-      // Call the Python inference script
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn(command, args);
-        let stderrTail = "";
-
-        child.stdout?.on("data", (data: Buffer) => {
-          const output = data.toString();
-          console.log(`[${job.uploadId}] ${output}`);
-
-          const progress = parsePipelineProgress(output);
-          if (progress !== null) {
-            job.progress = progress;
-          }
-        });
-
-        child.stderr?.on("data", (data: Buffer) => {
-          const output = data.toString();
-          stderrTail = `${stderrTail}${output}`.slice(-4000);
-          console.error(`[${job.uploadId}] ${output}`);
-        });
-
-        child.on("close", (code: number | null) => {
-          if (code === 0) {
-            if (fs.existsSync(detectionsPath)) {
-              job.detectionsPath = detectionsPath;
-            }
-            job.progress = 100;
-            job.status = "complete";
-            resolve();
-          } else {
-            const detail = stderrTail.trim();
-            reject(new Error(`Pipeline script exited with code ${code}${detail ? `: ${detail}` : ""}`));
-          }
-        });
-
-        child.on("error", (error: Error) => {
-          reject(error);
-        });
+      await runChildProcess(command, args, job.uploadId, (output) => {
+        const progress = parsePipelineProgress(output);
+        if (progress !== null) {
+          job.progress = Math.min(90, Math.round(progress * 0.9));
+        }
       });
+
+      if (!fs.existsSync(detectionsPath)) {
+        throw new Error(`Pipeline did not create detections file: ${detectionsPath}`);
+      }
+
+      job.status = "gps";
+      job.progress = 90;
+
+      const ocr = buildOcrCommand(this.projectRoot, runDir);
+      await runChildProcess(ocr.command, ocr.args, job.uploadId);
+
+      job.detectionsPath = detectionsPath;
+      job.progress = 100;
+      job.status = "complete";
     } catch (error) {
       job.status = "failed";
       job.error = error instanceof Error ? error.message : String(error);
       console.error(`Pipeline error for ${job.uploadId}:`, error);
     }
   }
+}
+
+function runChildProcess(
+  command: string,
+  args: string[],
+  uploadId: string,
+  onStdout?: (output: string) => void,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args);
+    let stderrTail = "";
+
+    child.stdout?.on("data", (data: Buffer) => {
+      const output = data.toString();
+      console.log(`[${uploadId}] ${output}`);
+      onStdout?.(output);
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      const output = data.toString();
+      stderrTail = `${stderrTail}${output}`.slice(-4000);
+      console.error(`[${uploadId}] ${output}`);
+    });
+
+    child.on("close", (code: number | null) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      const detail = stderrTail.trim();
+      reject(new Error(`Pipeline script exited with code ${code}${detail ? `: ${detail}` : ""}`));
+    });
+
+    child.on("error", (error: Error) => {
+      reject(error);
+    });
+  });
 }
 
 let singleton: PipelineWorkflowStoreImpl | null = null;

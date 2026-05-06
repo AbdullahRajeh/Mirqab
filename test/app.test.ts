@@ -13,6 +13,7 @@ import type {
 import type { DetectionServiceContract } from "../src/services/detection-service";
 import { resetMockWorkflowStore } from "../src/services/mock-workflow-store";
 import {
+  buildOcrCommand,
   buildPipelineCommand,
   parsePipelineProgress,
   type PipelineJob,
@@ -367,7 +368,7 @@ test("pipeline command matches the current inference.py CLI", () => {
     createdAtMs: Date.now(),
   };
 
-  const { command, args, detectionsPath } = buildPipelineCommand("C:\\repo", job, 30);
+  const { command, args, runDir, detectionsPath } = buildPipelineCommand("C:\\repo", job, 30);
 
   assert.equal(command, process.env.PYTHON_BIN ?? "python");
   assert.deepEqual(args, [
@@ -381,7 +382,19 @@ test("pipeline command matches the current inference.py CLI", () => {
     "--skip-frames",
     "30",
   ]);
+  assert.equal(runDir, "C:\\repo\\pipeline\\runs\\inference\\run_001");
   assert.equal(detectionsPath, "C:\\repo\\pipeline\\runs\\inference\\run_001\\detections.json");
+});
+
+test("OCR command runs against the generated inference run directory", () => {
+  const { command, args } = buildOcrCommand("C:\\repo", "C:\\repo\\pipeline\\runs\\inference\\run_001");
+
+  assert.equal(command, process.env.PYTHON_BIN ?? "python");
+  assert.deepEqual(args, [
+    "C:\\repo\\pipeline\\scripts\\ocr_gps.py",
+    "--run",
+    "C:\\repo\\pipeline\\runs\\inference\\run_001",
+  ]);
 });
 
 test("pipeline progress parser handles fraction and percent output", () => {

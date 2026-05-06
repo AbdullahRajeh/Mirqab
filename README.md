@@ -71,4 +71,4 @@ For a full local test, use `for_testing\dji.mov`.
 - **Annotated frames** — detected frames are saved with YOLO bounding boxes drawn on them
 - **Hot-swap** — after processing, the dashboard updates without restarting the server
 - **Skip frames control** — pick speed vs. accuracy from the UI
-- **GPS extraction** — EasyOCR reads drone OSD overlay to attach coordinates to each detection
+- **GPS extraction** — uploads run EasyOCR after inference to attach drone OSD coordinates to each detection
