@@ -5,6 +5,7 @@
   "main": "src/server.ts",
   "scripts": {
     "start": "tsx src/server.ts",
+    "setup:pipeline": "powershell -ExecutionPolicy Bypass -File scripts/setup-pipeline.ps1",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "test": "tsx --test test/*.test.ts",
