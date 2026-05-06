@@ -85,6 +85,21 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
       },
     }),
   );
+
+  // Custom Page Routes (Prioritized)
+  app.get("/", (_req, res) => {
+    res.sendFile(path.join(config.frontendPublicPath, "index.html"));
+  });
+  app.get("/login", redirectAuthedAdmin, (_req, res) => {
+    res.sendFile(path.join(config.frontendPublicPath, "login.html"));
+  });
+  app.get("/map", (_req, res) => {
+    res.sendFile(path.join(config.frontendPublicPath, "map.html"));
+  });
+  app.get("/dashboard", requireAdminPage, (_req, res) => {
+    res.sendFile(config.dashboardPagePath);
+  });
+
   app.use(
     createRouter({
       healthController,
@@ -101,15 +116,6 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
     }),
   );
   app.use(express.static(config.frontendPublicPath));
-  app.get("/login", redirectAuthedAdmin, (_req, res) => {
-    res.sendFile(path.join(config.frontendPublicPath, "login.html"));
-  });
-  app.get("/", (_req, res) => {
-    res.sendFile(path.join(config.frontendPublicPath, "index.html"));
-  });
-  app.get("/dashboard", requireAdminPage, (_req, res) => {
-    res.sendFile(config.dashboardPagePath);
-  });
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;

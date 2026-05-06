@@ -84,7 +84,7 @@ export function createAuthController(options: AuthControllerOptions): {
 
       res.json({
         success: true,
-        redirectTo: "/dashboard",
+        redirectTo: "/map",
       });
     },
 

@@ -83,7 +83,7 @@ async function redirectIfAlreadyAuthenticated() {
 
     const payload = await readJson(response);
     if (payload?.authenticated) {
-      window.location.replace("/dashboard");
+      window.location.replace("/map");
     }
   } catch {
     // Ignore auth probing failures on initial page load.

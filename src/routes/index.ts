@@ -40,14 +40,17 @@ export function createRouter({
   router.post("/auth/logout", authController.logout);
   router.get("/auth/session", authController.session);
 
-  router.use("/api/v1", requireAdminApi);
-  router.get("/api/v1/videos", detectionsController.listVideos);
-  router.get("/api/v1/detections/reviews", detectionsController.listReviews);
-  router.patch("/api/v1/detections/:detectionId/review", detectionsController.setReview);
+  // Public API Data (Accessible to both guests and admins)
   router.get("/api/v1/detections", detectionsController.listDetections);
   router.get("/api/v1/detections/stats", detectionsController.stats);
   router.get("/api/v1/detections/map", detectionsController.map);
   router.get("/api/v1/frames/:videoId/:frameId", detectionsController.frame);
+  router.get("/api/v1/videos", detectionsController.listVideos);
+
+  // Protected API (Admin only)
+  router.use("/api/v1", requireAdminApi);
+  router.get("/api/v1/detections/reviews", detectionsController.listReviews);
+  router.patch("/api/v1/detections/:detectionId/review", detectionsController.setReview);
 
   router.post("/api/v1/mock/videos/upload", mockWorkflowController.uploadVideo);
   router.get("/api/v1/mock/videos/upload/:uploadId", mockWorkflowController.getUploadStatus);
