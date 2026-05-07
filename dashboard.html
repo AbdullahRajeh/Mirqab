@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MIRQAB / DASHBOARD</title>
+    <title>MIRQAB / ADMIN</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,169 +22,187 @@
     </div>
 
     <main class="dashboard-page">
-      <header class="dashboard-page-head">
-        <div class="head-left">
+
+      <!-- Header -->
+      <header class="db-header">
+        <div class="db-header-brand">
           <div class="id-mark">MIRQAB // OPS_COMMAND</div>
-          <h1>لوحة التحليلات</h1>
+          <h1>لوحة الإدارة</h1>
         </div>
-        <div class="dashboard-page-toolbar">
-          <a href="/map" class="btn-nav" aria-label="العودة إلى الخريطة">
-            <span class="icon">←</span>
-            <span class="text">عودة للخريطة</span>
-          </a>
-          <button id="logout-button" type="button" class="btn-danger">إنهاء الجلسة</button>
+        <div class="db-header-actions">
+          <button id="btn-refresh" type="button" class="btn-ghost">↻ تحديث</button>
+          <a href="/map" class="btn-ghost">← الخريطة</a>
+          <button id="logout-button" type="button" class="btn-danger-sm">خروج</button>
         </div>
       </header>
 
-      <p id="message" class="dashboard-page-message message" aria-live="polite"></p>
+      <p id="message" class="db-message message" aria-live="polite"></p>
 
-      <section class="dashboard-kpis">
-        <div class="dashboard-kpi">
+      <!-- KPIs -->
+      <section class="db-kpis">
+        <div class="db-kpi">
           <span class="kpi-label">إجمالي العيوب</span>
           <span id="total-pins" class="kpi-value">0</span>
         </div>
-        <div class="dashboard-kpi">
+        <div class="db-kpi db-kpi--warn">
+          <span class="kpi-label">إجمالي المحذوفة</span>
+          <span id="deleted-count" class="kpi-value">0</span>
+        </div>
+        <div class="db-kpi">
           <span class="kpi-label">أكثر فيديو اكتشافاً</span>
-          <span id="worst-hood" class="kpi-value text-accent">-</span>
+          <span id="worst-hood" class="kpi-value">-</span>
         </div>
-        <div class="dashboard-kpi">
+        <div class="db-kpi">
           <span class="kpi-label">متوسط الثقة</span>
-          <span id="avg-confidence" class="kpi-value text-accent">0%</span>
+          <span id="avg-confidence" class="kpi-value">0%</span>
         </div>
       </section>
 
-      <section class="dashboard-tools">
-        <div class="tools-head">
-          <div class="section-title">
-            <span class="eyebrow">أدوات التحكم</span>
-            <h2>إدارة البيانات والرفع</h2>
+      <!-- Upload banner -->
+      <section class="upload-banner">
+        <input id="upload-input" type="file" accept="video/*" class="hidden-input" />
+        <div class="upload-dropzone" id="upload-dropzone">
+          <div class="dropzone-idle" id="dropzone-idle">
+            <div class="dropzone-icon">⬆</div>
+            <div class="dropzone-text">
+              <span class="dropzone-main">اسحب ملف الفيديو هنا</span>
+              <span class="dropzone-sep">أو</span>
+              <button id="upload-trigger" type="button" class="btn-upload-link">اختر ملفاً</button>
+            </div>
+            <span id="upload-filename" class="dropzone-filename">MP4 · MOV · AVI · MKV · WEBM حتى 4GB</span>
           </div>
-          <button id="btn-refresh" type="button" class="btn-technical">تحديث البيانات</button>
+          <div id="upload-progress-wrap" class="dropzone-progress" hidden>
+            <div class="progress-track">
+              <div id="upload-progress-bar" class="progress-fill"></div>
+            </div>
+            <span id="upload-status-text" class="upload-status-label"></span>
+          </div>
         </div>
-
-        <div class="tools-layout">
-          <div class="tools-section">
-            <h3 class="tools-subtitle">فلترة الجدول</h3>
-            <div class="filter-controls">
-              <div class="control-item">
-                <label for="video-filter">الفيديو</label>
-                <select id="video-filter" class="tech-select"><option value="">الكل</option></select>
-              </div>
-              <div class="control-item">
-                <label for="page-size">الصفوف</label>
-                <select id="page-size" class="tech-select">
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="200" selected>200</option>
-                </select>
-              </div>
-              <div class="control-item">
-                <label for="sort-by">ترتيب حسب</label>
-                <select id="sort-by" class="tech-select">
-                  <option value="timestampSec">الوقت</option>
-                  <option value="confidence">الثقة</option>
-                  <option value="videoId">الفيديو</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="tools-section upload-zone">
-            <h3 class="tools-subtitle">رفع فيديو جديد</h3>
-            <input id="upload-input" type="file" accept="video/*" class="hidden-input" />
-            <div class="upload-actions">
-              <button id="upload-trigger" type="button" class="btn-upload">اختيار الملف</button>
-              <span id="upload-filename" class="upload-filename">لم يُختر ملف</span>
-            </div>
-            <div class="upload-config">
-              <label for="skip-frames-input">تخطي الإطارات:</label>
-              <input id="skip-frames-input" type="number" min="1" max="120" value="30" />
-            </div>
-            <div id="upload-progress-wrap" class="upload-progress-wrap" hidden>
-              <div class="progress-track"><div id="upload-progress-bar" class="progress-fill"></div></div>
-              <span id="upload-status-text" class="upload-status"></span>
-            </div>
-          </div>
+        <div class="upload-config-row">
+          <label for="skip-frames-input">تخطي الإطارات</label>
+          <input id="skip-frames-input" type="number" min="1" max="120" value="30" class="config-input" />
+          <span class="config-hint">إطار من كل N إطارات</span>
         </div>
       </section>
 
-      <div class="dashboard-main-area">
-        <div class="data-column">
-          <section class="chart-section tech-panel">
-            <div class="panel-head">
-              <h3>توزيع الاكتشافات</h3>
-              <span class="panel-sub">أعلى المصادر</span>
+      <!-- Main workspace -->
+      <div class="db-workspace">
+
+        <!-- List pane: chart + table -->
+        <div class="db-list-pane">
+
+          <section class="db-card chart-card">
+            <div class="db-card-head">
+              <span class="card-title">توزيع الاكتشافات</span>
+              <span class="card-sub">أعلى المصادر</span>
             </div>
             <div class="chart-container">
               <canvas id="severityChart"></canvas>
             </div>
           </section>
 
-          <section class="table-section tech-panel">
-            <div class="panel-head">
-              <h3>سجل الاكتشافات</h3>
-              <div class="pagination">
-                <span id="page-info"></span>
-                <button id="btn-prev-page" class="btn-arrow">↑</button>
-                <button id="btn-next-page" class="btn-arrow">↓</button>
+          <section class="db-card table-card">
+            <div class="db-card-head table-card-head">
+              <span class="card-title">سجل الاكتشافات</span>
+              <div class="table-toolbar">
+                <select id="video-filter" class="tech-select" title="فلتر الفيديو">
+                  <option value="">كل الفيديوهات</option>
+                </select>
+                <select id="page-size" class="tech-select">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="200" selected>200</option>
+                </select>
+                <select id="sort-by" class="tech-select">
+                  <option value="timestampSec">الوقت</option>
+                  <option value="confidence">الثقة</option>
+                  <option value="videoId">الفيديو</option>
+                </select>
+                <select id="sort-order" class="tech-select">
+                  <option value="desc">↓</option>
+                  <option value="asc">↑</option>
+                </select>
+                <label class="compact-label">
+                  <input id="compact-toggle" type="checkbox" />
+                  <span>مضغوط</span>
+                </label>
               </div>
             </div>
-            <div class="table-container">
+            <div class="table-pagination-bar">
+              <span id="page-info" class="page-info"></span>
+              <div class="page-btns">
+                <button id="btn-prev-page" class="btn-page">↑</button>
+                <button id="btn-next-page" class="btn-page">↓</button>
+              </div>
+            </div>
+            <div class="table-scroll-wrap">
               <table id="pins-table">
                 <thead>
                   <tr>
                     <th>الصورة</th>
-                    <th>الفيديو</th>
-                    <th>الإطار</th>
-                    <th>الوقت</th>
-                    <th>الثقة</th>
-                    <th>المراجعة</th>
-                    <th>عرض</th>
+                    <th class="th-sortable" data-sort="videoId">الفيديو</th>
+                    <th class="th-sortable" data-sort="frameId">الإطار</th>
+                    <th class="th-sortable" data-sort="timestampSec">الوقت</th>
+                    <th class="th-sortable" data-sort="confidence">الثقة</th>
+                    <th>الحالة</th>
+                    <th>إجراء</th>
                   </tr>
                 </thead>
                 <tbody id="pins-body"></tbody>
               </table>
             </div>
           </section>
+
         </div>
 
-        <aside class="review-panel tech-panel">
-          <div class="panel-head">
-            <h3>مراجعة الاكتشاف</h3>
-            <p id="review-queue-hint" class="panel-sub"></p>
-          </div>
-          <div class="review-content">
-            <div class="preview-box">
-              <button id="review-image-trigger" class="btn-zoom" hidden>
-                <img id="review-image" src="" alt="معاينة" />
+        <!-- Review pane -->
+        <aside class="db-review-pane">
+          <div class="db-card review-card">
+            <div class="db-card-head">
+              <span class="card-title">مراجعة الإطار</span>
+              <span id="review-queue-hint" class="card-sub review-queue-badge"></span>
+            </div>
+
+            <div class="review-image-zone">
+              <button id="review-image-trigger" class="review-img-btn" hidden>
+                <img id="review-image" src="" alt="معاينة الإطار" />
+                <span class="zoom-hint">🔍 انقر للتكبير</span>
               </button>
-              <div id="review-empty">اختر صفاً للمراجعة</div>
+              <div id="review-empty" class="review-empty">
+                <span>اختر إطاراً للمراجعة</span>
+              </div>
             </div>
+
             <dl id="review-meta" class="review-meta"></dl>
+
             <div class="review-actions">
-              <button id="btn-approve" class="btn-approve">موافقة</button>
-              <button id="btn-reject" class="btn-reject">رفض</button>
+              <button id="btn-delete" class="btn-delete" disabled>🗑 حذف الإطار</button>
+              <button id="btn-restore" class="btn-restore" hidden>↩ استعادة الإطار</button>
             </div>
-            <div class="review-nav">
-              <button id="btn-review-prev" class="btn-nav-small">← السابق</button>
-              <button id="btn-review-next" class="btn-nav-small">التالي →</button>
+
+            <div class="review-nav-row">
+              <button id="btn-review-prev" class="btn-nav-item">← السابق</button>
+              <button id="btn-review-next" class="btn-nav-item">التالي →</button>
             </div>
-            <a id="map-link" class="link-map" href="#" hidden>فتح الموقع على الخريطة</a>
+
+            <a id="map-link" class="btn-map-link" href="#" hidden>فتح الموقع على الخريطة →</a>
           </div>
         </aside>
+
       </div>
     </main>
 
-    <div id="image-viewer" class="tech-modal" hidden>
+    <!-- Full-screen image viewer -->
+    <div id="image-viewer" class="image-modal" hidden>
       <div id="image-viewer-backdrop" class="modal-backdrop"></div>
-      <div class="modal-content">
-        <div class="modal-toolbar">
+      <div class="modal-box">
+        <div class="modal-bar">
           <strong>معاينة الإطار</strong>
-          <div class="modal-controls">
-            <button id="image-viewer-zoom-out">-</button>
+          <div class="modal-zoom-controls">
+            <button id="image-viewer-zoom-out">−</button>
             <span id="image-viewer-zoom-value">100%</span>
             <button id="image-viewer-zoom-in">+</button>
-            <button id="image-viewer-close">إغلاق</button>
+            <button id="image-viewer-close">✕ إغلاق</button>
           </div>
         </div>
         <div id="image-viewer-stage" class="modal-stage">
