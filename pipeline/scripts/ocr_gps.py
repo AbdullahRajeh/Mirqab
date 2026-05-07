@@ -20,6 +20,11 @@ import sys
 import cv2
 import easyocr
 
+try:
+    import torch
+except ImportError:
+    torch = None
+
 
 def _parse_segments(segments):
     """
@@ -117,7 +122,8 @@ def run_ocr(run_dir):
 
     # Load EasyOCR model once
     print("  Loading OCR model...")
-    reader = easyocr.Reader(["en"], gpu=True, verbose=False)
+    use_gpu = bool(torch and torch.cuda.is_available())
+    reader = easyocr.Reader(["en"], gpu=use_gpu, verbose=False)
     print("  Ready.\n")
 
     success = 0

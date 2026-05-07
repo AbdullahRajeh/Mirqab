@@ -12,6 +12,12 @@ import type {
 } from "../src/types";
 import type { DetectionServiceContract } from "../src/services/detection-service";
 import { resetMockWorkflowStore } from "../src/services/mock-workflow-store";
+import {
+  buildOcrCommand,
+  buildPipelineCommand,
+  parsePipelineProgress,
+  type PipelineJob,
+} from "../src/services/pipeline-workflow-store";
 import { HttpError } from "../src/utils/http-error";
 
 class FakeService {
@@ -349,6 +355,71 @@ test("POST /api/v1/mock/videos/upload and GET status succeed when authenticated"
   assert.equal(polled.statusCode, 200);
   assert.equal(polled.body.uploadId, uploadId);
   assert.ok(polled.body.progress >= 0);
+});
+
+test("pipeline command matches the current inference.py CLI", () => {
+  const job: PipelineJob = {
+    uploadId: "upl_1",
+    runName: "run_001",
+    fileName: "clip.mp4",
+    filePath: "C:\\uploads\\clip.mp4",
+    status: "queued",
+    progress: 0,
+    createdAtMs: Date.now(),
+  };
+
+  const { command, args, runDir, detectionsPath } = buildPipelineCommand("C:\\repo", job, 30);
+
+  assert.equal(command, process.env.PYTHON_BIN ?? "python");
+  assert.deepEqual(args, [
+    "C:\\repo\\pipeline\\scripts\\inference.py",
+    "--model",
+    "C:\\repo\\pipeline\\models\\best.pt",
+    "--input",
+    "C:\\uploads\\clip.mp4",
+    "--name",
+    "run_001",
+    "--skip-frames",
+    "30",
+  ]);
+  assert.equal(runDir, "C:\\repo\\pipeline\\runs\\inference\\run_001");
+  assert.equal(detectionsPath, "C:\\repo\\pipeline\\runs\\inference\\run_001\\detections.json");
+});
+
+test("OCR command runs against the generated inference run directory", () => {
+  const { command, args } = buildOcrCommand("C:\\repo", "C:\\repo\\pipeline\\runs\\inference\\run_001");
+
+  assert.equal(command, process.env.PYTHON_BIN ?? "python");
+  assert.deepEqual(args, [
+    "C:\\repo\\pipeline\\scripts\\ocr_gps.py",
+    "--run",
+    "C:\\repo\\pipeline\\runs\\inference\\run_001",
+  ]);
+});
+
+test("pipeline progress parser handles fraction and percent output", () => {
+  assert.equal(parsePipelineProgress("PROGRESS:1/4"), 25);
+  assert.equal(parsePipelineProgress("PROGRESS: 3 / 4"), 75);
+  assert.equal(parsePipelineProgress("progress: 42"), 42);
+  assert.equal(parsePipelineProgress("TOTAL_FRAMES:120"), null);
+});
+
+test("pipeline jobs can report a non-fatal OCR warning", () => {
+  const job: PipelineJob = {
+    uploadId: "upl_1",
+    runName: "run_001",
+    fileName: "clip.mp4",
+    filePath: "C:\\uploads\\clip.mp4",
+    status: "complete",
+    progress: 100,
+    warning: "GPS OCR failed; detections are available without GPS",
+    detectionsPath: "C:\\repo\\pipeline\\runs\\inference\\run_001\\detections.json",
+    createdAtMs: Date.now(),
+  };
+
+  assert.equal(job.status, "complete");
+  assert.match(job.warning ?? "", /GPS OCR failed/);
+  assert.ok(job.detectionsPath);
 });
 
 test("PATCH /api/v1/detections/:id/review and GET reviews succeed when authenticated", async () => {

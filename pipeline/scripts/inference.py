@@ -193,7 +193,11 @@ def run_video_inference(model, args, output_dir):
 
     cap.release()
     writer.release()
-    cv2.destroyAllWindows()
+    if args.show:
+        try:
+            cv2.destroyAllWindows()
+        except cv2.error:
+            pass
     elapsed = time.time() - start
 
     print(f"\n  Total frames: {frame_idx}")

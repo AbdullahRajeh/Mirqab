@@ -224,15 +224,15 @@ button:hover,
   background: rgba(10, 10, 12, 0.96);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  padding: 3rem 4vw;
+  padding: 2.5rem 3.5vw;
   display: grid !important;
-  grid-template-columns: minmax(400px, 1.2fr) minmax(400px, 1.8fr);
+  grid-template-columns: 1fr 1.6fr;
   grid-template-rows: auto auto minmax(0, 1fr);
   grid-template-areas:
     'head head'
     'stats stats'
     'chart table';
-  gap: 2rem 2.5rem;
+  gap: 1.5rem 2rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 350ms ease, transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -293,7 +293,7 @@ button:hover,
 }
 .close-btn:hover {
   background: #ffffff;
-  color: #fff;
+  color: #0a0a0a;
   border-color: #ffffff;
   transform: scale(1.05);
 }
@@ -305,8 +305,8 @@ button:hover,
   width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 1.2rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 .card {
@@ -314,31 +314,31 @@ button:hover,
   border-radius: var(--radius-md);
   background: rgba(25, 25, 25, 0.5);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-  padding: 1.6rem 1.4rem;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  padding: 1.2rem 1.1rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  min-height: 130px;
+  min-height: 100px;
 }
 .card:hover {
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-2px);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .card h3 {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   line-height: 1.4;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   font-weight: 600;
 }
 
 .value {
-  margin-top: 1rem;
-  font-size: 2.2rem;
+  margin-top: 0.6rem;
+  font-size: 2rem;
   line-height: 1;
   font-weight: 800;
   font-family: inherit;
@@ -346,16 +346,25 @@ button:hover,
 }
 
 .value.small {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
 }
 
 .value-danger {
-  color: #ffffff;
+  color: #fb7185;
 }
 
 .value-accent {
-  color: #fff;
+  color: #60a5fa;
 }
+
+/* Card accent stripes */
+.stats .card:nth-child(1) { border-top: 2px solid rgba(255, 255, 255, 0.45); }
+.stats .card:nth-child(2) { border-top: 2px solid rgba(251, 113, 133, 0.5); }
+.stats .card:nth-child(2) .value { color: #fb7185; }
+.stats .card:nth-child(3) { border-top: 2px solid rgba(96, 165, 250, 0.5); }
+.stats .card:nth-child(3) .value { color: #60a5fa; }
+.stats .card:nth-child(4) { border-top: 2px solid rgba(52, 211, 153, 0.5); }
+.stats .card:nth-child(4) .value { color: #34d399; }
 
 /* Chart */
 .dashboard-panel > section:nth-of-type(2) {
@@ -546,21 +555,7 @@ tbody tr:hover {
 }
 
 /* Responsiveness */
-@media (max-width: 1800px) {
-  .dashboard-panel {
-    padding: 3rem 3vw;
-    grid-template-columns: minmax(320px, 1.2fr) minmax(380px, 1.8fr);
-    grid-template-areas:
-      'head head'
-      'stats stats'
-      'chart table';
-  }
-  .stats {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  }
-}
-
-@media (max-width: 1400px) {
+@media (max-width: 1200px) {
   .dashboard-panel {
     grid-template-columns: 1fr;
     grid-template-areas:
@@ -570,24 +565,17 @@ tbody tr:hover {
       'table';
   }
   .dashboard-panel .table-wrap {
-    min-height: 480px;
+    min-height: 420px;
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .dashboard-panel {
-    padding: 2rem 4vw;
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'head'
-      'stats'
-      'chart'
-      'table';
+    padding: 1.5rem 4vw;
     overflow-y: auto;
   }
-
   .stats {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -596,7 +584,10 @@ tbody tr:hover {
     grid-template-columns: repeat(2, 1fr);
   }
   .dashboard-panel {
-    padding: 1.5rem 1rem;
+    padding: 1.25rem 1rem;
+  }
+  .dashboard-head h2 {
+    font-size: 1.8rem;
   }
 }
 

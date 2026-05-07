@@ -1,0 +1,3 @@
+[    3353ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[   18716ms] TypeError: Cannot read properties of null (reading 'classList')
+    at http://localhost:3000/map:112:19
