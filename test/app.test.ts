@@ -404,6 +404,24 @@ test("pipeline progress parser handles fraction and percent output", () => {
   assert.equal(parsePipelineProgress("TOTAL_FRAMES:120"), null);
 });
 
+test("pipeline jobs can report a non-fatal OCR warning", () => {
+  const job: PipelineJob = {
+    uploadId: "upl_1",
+    runName: "run_001",
+    fileName: "clip.mp4",
+    filePath: "C:\\uploads\\clip.mp4",
+    status: "complete",
+    progress: 100,
+    warning: "GPS OCR failed; detections are available without GPS",
+    detectionsPath: "C:\\repo\\pipeline\\runs\\inference\\run_001\\detections.json",
+    createdAtMs: Date.now(),
+  };
+
+  assert.equal(job.status, "complete");
+  assert.match(job.warning ?? "", /GPS OCR failed/);
+  assert.ok(job.detectionsPath);
+});
+
 test("PATCH /api/v1/detections/:id/review and GET reviews succeed when authenticated", async () => {
   resetMockWorkflowStore();
   const app = createTestApp();

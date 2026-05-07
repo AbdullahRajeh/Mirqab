@@ -99,6 +99,7 @@ export function createPipelineWorkflowController(
         status: job.status,
         progress: job.progress,
         error: job.error,
+        warning: job.warning,
       });
     },
   };

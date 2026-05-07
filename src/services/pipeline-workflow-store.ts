@@ -12,6 +12,7 @@ export type PipelineJob = {
   status: PipelineJobStatus;
   progress: number;
   error?: string;
+  warning?: string;
   detectionsPath?: string;
   _swapped?: boolean;
   createdAtMs: number;
@@ -152,7 +153,14 @@ class PipelineWorkflowStoreImpl {
       job.progress = 90;
 
       const ocr = buildOcrCommand(this.projectRoot, runDir);
-      await runChildProcess(ocr.command, ocr.args, job.uploadId);
+      try {
+        await runChildProcess(ocr.command, ocr.args, job.uploadId);
+      } catch (error) {
+        job.warning = `GPS OCR failed; detections are available without GPS: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        console.error(`OCR warning for ${job.uploadId}:`, error);
+      }
 
       job.detectionsPath = detectionsPath;
       job.progress = 100;
