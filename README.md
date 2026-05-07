@@ -61,6 +61,7 @@ Open **http://localhost:3000** in your browser, log in with:
 For a full local test, use `for_testing\dji.mov`.
 
 > Processing time depends on video length and whether you have a GPU. A 5-minute video at skip=30 takes ~2 minutes on CPU.
+> OCR runs after detection to extract GPS from the drone overlay. If OCR fails, the upload still completes and detections are shown without GPS.
 
 ---
 
@@ -72,3 +73,4 @@ For a full local test, use `for_testing\dji.mov`.
 - **Hot-swap** — after processing, the dashboard updates without restarting the server
 - **Skip frames control** — pick speed vs. accuracy from the UI
 - **GPS extraction** — uploads run EasyOCR after inference to attach drone OSD coordinates to each detection
+- **OCR fallback** — detection results still complete if OCR cannot read GPS from the video
