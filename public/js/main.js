@@ -404,6 +404,12 @@ async function renderMap({ preserveView }) {
     marker.popup = popup;
     state.markers.set(point.id, marker);
   }
+  if (state.pendingFocusId) {
+    const focusId = state.pendingFocusId;
+    state.pendingFocusId = null;
+    if (focusDetection(focusId)) return;
+  }
+
   if (!preserveView) fitMapToData();
 }
 
@@ -416,10 +422,11 @@ function fitMapToData() {
 
 function focusDetection(id) {
   const p = state.mapPoints.find(i => i.id === id);
-  if (!p) return;
+  if (!p) return false;
   const m = state.markers.get(id);
   if (m?.popup) m.popup.setHTML(getPopupHtml(p, true)).setLngLat([p.lng, p.lat]).addTo(map);
   map.flyTo({ center: [p.lng, p.lat], zoom: 15.5, pitch: 58, duration: 1400 });
+  return true;
 }
 
 function getPopupHtml(p, expanded = false) {

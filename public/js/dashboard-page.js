@@ -8,6 +8,7 @@ const PIPELINE_UPLOAD = "/api/v1/pipeline/upload";
 
 function pipelineUploadStatusUrl(id) { return `/api/v1/pipeline/upload/${encodeURIComponent(id)}`; }
 function detectionReviewUrl(id) { return `/api/v1/detections/${encodeURIComponent(id)}/review`; }
+function mapFocusUrl(pointId) { return `/map?focus=${encodeURIComponent(pointId)}`; }
 
 function buildDetectionsUrl() {
   const p = new URLSearchParams();
@@ -497,7 +498,7 @@ function renderTable() {
   pinsBody.innerHTML = state.detections.map((d) => {
     const isDeleted = state.reviews.get(d.id) === "rejected";
     const isActive  = d.id === state.activeDetectionId;
-    const mapHref   = `/?focus=${encodeURIComponent(d.pointId)}`;
+    const mapHref   = mapFocusUrl(d.pointId);
 
     const statusCell = isDeleted
       ? `<span class="status-badge status-badge--deleted">محذوف</span>`
@@ -567,7 +568,7 @@ function renderReviewPanel() {
 
   if (mapLink instanceof HTMLAnchorElement) {
     mapLink.hidden = false;
-    mapLink.href = `/?focus=${encodeURIComponent(d.pointId)}`;
+    mapLink.href = mapFocusUrl(d.pointId);
   }
 }
 
