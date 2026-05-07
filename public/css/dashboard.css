@@ -249,9 +249,10 @@ body.dashboard-root {
 .review-queue-badge { background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); color: var(--reject-color); padding: 0.15rem 0.6rem; font-size: 0.65rem; font-family: 'Changa', sans-serif; }
 
 .review-image-zone { background: #000; border-bottom: 1px solid var(--border); min-height: 240px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-.review-img-btn { width: 100%; border: none; background: transparent; cursor: zoom-in; padding: 0; display: block; position: relative; min-height: unset; }
+.review-img-btn { width: 100%; border: none; background: transparent; cursor: grab; padding: 0; display: block; position: relative; min-height: unset; overflow: hidden; }
+.review-img-btn.is-dragging { cursor: grabbing; }
 .review-img-btn:hover .zoom-hint { opacity: 1; }
-#review-image { width: 100%; max-height: 320px; object-fit: contain; display: block; }
+#review-image { width: 100%; max-height: 320px; object-fit: contain; display: block; transform-origin: 0 0; will-change: transform; user-select: none; -webkit-user-drag: none; }
 .zoom-hint { position: absolute; bottom: 0.5rem; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: var(--fg); font-size: 0.7rem; padding: 0.25rem 0.75rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
 .review-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.82rem; padding: 3rem; }
 

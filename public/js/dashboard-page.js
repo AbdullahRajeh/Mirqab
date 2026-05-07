@@ -177,8 +177,13 @@ function bindUi() {
   btnDelete?.addEventListener("click",  () => void submitReview("rejected"));
   btnRestore?.addEventListener("click", () => void submitReview("approved"));
 
-  // Image viewer
-  reviewImageTrigger?.addEventListener("click", openImageViewer);
+  // Inline scroll-to-zoom / drag-to-pan on review image
+  reviewImageTrigger?.addEventListener("wheel", onReviewImageWheel, { passive: false });
+  reviewImageTrigger?.addEventListener("mousedown", onReviewImageMouseDown);
+  document.addEventListener("mousemove", onReviewImageMouseMove);
+  document.addEventListener("mouseup", onReviewImageMouseUp);
+
+  // Image viewer (modal, kept for future use)
   imageViewerBackdrop?.addEventListener("click", closeImageViewer);
   imageViewerClose?.addEventListener("click", closeImageViewer);
   imageViewerZoomIn?.addEventListener("click",  () => setZoom(state.imageViewerZoom + 0.25));
@@ -533,7 +538,7 @@ function renderReviewPanel() {
   const d = state.detections.find((x) => x.id === state.activeDetectionId) ?? null;
 
   if (!d) {
-    if (reviewImageTrigger instanceof HTMLButtonElement) reviewImageTrigger.hidden = true;
+    if (reviewImageTrigger instanceof HTMLElement) reviewImageTrigger.hidden = true;
     if (reviewImage instanceof HTMLImageElement) reviewImage.removeAttribute("src");
     if (reviewEmpty) reviewEmpty.hidden = false;
     if (reviewMeta) reviewMeta.innerHTML = "";
@@ -544,7 +549,8 @@ function renderReviewPanel() {
   }
 
   if (reviewEmpty) reviewEmpty.hidden = true;
-  if (reviewImageTrigger instanceof HTMLButtonElement) reviewImageTrigger.hidden = false;
+  if (reviewImageTrigger instanceof HTMLElement) reviewImageTrigger.hidden = false;
+  resetReviewZoom();
 
   if (reviewImage instanceof HTMLImageElement) {
     reviewImage.src = d.imageUrl;
@@ -679,4 +685,61 @@ function formatSeconds(v)   {
 }
 function escapeHtml(v) {
   return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ── Inline review image zoom / pan ──
+
+const reviewImgState = { scale: 1, tx: 0, ty: 0 };
+const reviewImgDrag  = { active: false, startX: 0, startY: 0, startTx: 0, startTy: 0 };
+
+function resetReviewZoom() {
+  reviewImgState.scale = 1; reviewImgState.tx = 0; reviewImgState.ty = 0;
+  if (reviewImage instanceof HTMLImageElement) reviewImage.style.transform = "";
+  if (reviewImageTrigger instanceof HTMLElement) reviewImageTrigger.classList.remove("is-dragging");
+}
+
+function applyReviewZoom() {
+  if (!(reviewImage instanceof HTMLImageElement) || !(reviewImageTrigger instanceof HTMLElement)) return;
+  const { scale, tx, ty } = reviewImgState;
+  const cw = reviewImageTrigger.offsetWidth, ch = reviewImageTrigger.offsetHeight;
+  const iw = reviewImage.offsetWidth,        ih = reviewImage.offsetHeight;
+  reviewImgState.tx = Math.min(0, Math.max(tx, cw - iw * scale));
+  reviewImgState.ty = Math.min(0, Math.max(ty, ch - ih * scale));
+  reviewImage.style.transform = `translate(${reviewImgState.tx}px,${reviewImgState.ty}px) scale(${scale})`;
+}
+
+function onReviewImageWheel(e) {
+  if (!(reviewImage instanceof HTMLImageElement) || !(reviewImageTrigger instanceof HTMLElement)) return;
+  e.preventDefault();
+  const rect = reviewImageTrigger.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const newScale = Math.max(1, Math.min(6, reviewImgState.scale * factor));
+  if (newScale === 1) { resetReviewZoom(); return; }
+  reviewImgState.tx = mx - (mx - reviewImgState.tx) * (newScale / reviewImgState.scale);
+  reviewImgState.ty = my - (my - reviewImgState.ty) * (newScale / reviewImgState.scale);
+  reviewImgState.scale = newScale;
+  applyReviewZoom();
+}
+
+function onReviewImageMouseDown(e) {
+  if (reviewImgState.scale <= 1) return;
+  reviewImgDrag.active = true;
+  reviewImgDrag.startX = e.clientX; reviewImgDrag.startY = e.clientY;
+  reviewImgDrag.startTx = reviewImgState.tx; reviewImgDrag.startTy = reviewImgState.ty;
+  if (reviewImageTrigger instanceof HTMLElement) reviewImageTrigger.classList.add("is-dragging");
+  e.preventDefault();
+}
+
+function onReviewImageMouseMove(e) {
+  if (!reviewImgDrag.active) return;
+  reviewImgState.tx = reviewImgDrag.startTx + (e.clientX - reviewImgDrag.startX);
+  reviewImgState.ty = reviewImgDrag.startTy + (e.clientY - reviewImgDrag.startY);
+  applyReviewZoom();
+}
+
+function onReviewImageMouseUp() {
+  if (!reviewImgDrag.active) return;
+  reviewImgDrag.active = false;
+  if (reviewImageTrigger instanceof HTMLElement) reviewImageTrigger.classList.remove("is-dragging");
 }
