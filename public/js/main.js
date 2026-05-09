@@ -249,7 +249,6 @@ async function loadDashboardData({ preserveView }) {
     await renderMap({ preserveView });
     focusPendingDetection();
     void enrichNeighborhoodNames();
-    setupDynamicMask();
 
     setMessage("", false);
   } catch (error) {
@@ -259,97 +258,6 @@ async function loadDashboardData({ preserveView }) {
   } finally {
     setLoading(false);
   }
-}
-
-function setupDynamicMask() {
-  if (!map || state.mapPoints.length === 0) return;
-
-  const points = state.mapPoints;
-  const lats = points.map(p => p.lat);
-  const lngs = points.map(p => p.lng);
-  
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLng = (minLng + maxLng) / 2;
-  const center = [centerLng, centerLat];
-
-  const maxDist = points.reduce((max, p) => {
-    const d = getDistance(centerLat, centerLng, p.lat, p.lng);
-    return Math.max(max, d);
-  }, 0);
-  
-  const radius = Math.max(8, maxDist + 5);
-  const donut = createInvertedCircle(center, radius);
-
-  try {
-    if (map.getSource('monitoring-mask')) {
-      map.getSource('monitoring-mask').setData(donut);
-    } else {
-      map.addSource('monitoring-mask', { 'type': 'geojson', 'data': donut });
-    }
-
-    if (!map.getLayer('monitoring-mask-fill')) {
-      map.addLayer({
-        'id': 'monitoring-mask-fill',
-        'type': 'fill',
-        'source': 'monitoring-mask',
-        'paint': { 'fill-color': '#000000', 'fill-opacity': 1 }
-      });
-    }
-
-    const outline = {
-      'type': 'Feature',
-      'geometry': { 'type': 'LineString', 'coordinates': donut.geometry.coordinates[1] }
-    };
-
-    if (map.getSource('monitoring-outline')) {
-      map.getSource('monitoring-outline').setData(outline);
-    } else {
-      map.addSource('monitoring-outline', { 'type': 'geojson', 'data': outline });
-    }
-
-    if (!map.getLayer('monitoring-mask-border')) {
-      map.addLayer({
-        'id': 'monitoring-mask-border',
-        'type': 'line',
-        'source': 'monitoring-outline',
-        'paint': { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 0.8 }
-      });
-    }
-
-    if (!state.selectedPointId) {
-      map.easeTo({ center, zoom: 10, duration: 1000 });
-    }
-  } catch (e) {
-    console.error("Mask setup failed:", e);
-  }
-}
-
-function createInvertedCircle(center, radiusInKm, points = 128) {
-  const [lng, lat] = center;
-  const hole = [];
-  const dX = radiusInKm / (111.32 * Math.cos(lat * Math.PI / 180));
-  const dY = radiusInKm / 110.574;
-
-  for (let i = 0; i <= points; i++) {
-    const t = (i / points) * (2 * Math.PI);
-    hole.push([lng + dX * Math.cos(t), lat + dY * Math.sin(t)]);
-  }
-
-  const world = [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]];
-  return { 'type': 'Feature', 'geometry': { 'type': 'Polygon', 'coordinates': [world, hole] } };
-}
-
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 async function fetchJson(url) {
@@ -466,11 +374,11 @@ async function renderMap({ preserveView }) {
           ["linear"],
           ["zoom"],
           8,
-          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 7, 8, 11],
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 11, 8, 16],
           14,
-          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 12, 8, 18],
-          18,
           ["interpolate", ["linear"], ["get", "detectionCount"], 1, 18, 8, 26],
+          18,
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 26, 8, 36],
         ],
         "circle-color": "#ffffff",
         "circle-opacity": 0.16,
@@ -489,11 +397,11 @@ async function renderMap({ preserveView }) {
           ["linear"],
           ["zoom"],
           8,
-          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 3.5, 8, 5.5],
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 6, 8, 9],
           14,
-          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 5.5, 8, 8],
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 9, 8, 14],
           18,
-          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 8, 8, 11],
+          ["interpolate", ["linear"], ["get", "detectionCount"], 1, 14, 8, 20],
         ],
         "circle-color": "#ffffff",
         "circle-opacity": 0.96,
@@ -583,7 +491,7 @@ function showPointPopup(point, expanded = false) {
     offset: 20,
     closeButton: false,
     className: expanded ? "pin-popup-shell pin-popup-shell--expanded" : "pin-popup-shell",
-    maxWidth: expanded ? "420px" : "280px",
+    maxWidth: expanded ? "520px" : "360px",
   })
     .setLngLat([point.lng, point.lat])
     .setHTML(getPopupHtml(point, expanded))

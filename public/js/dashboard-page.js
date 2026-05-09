@@ -660,8 +660,13 @@ function renderCharts() {
   const stats = state.stats;
   if (!stats) return;
 
-  // 1. Time-Confidence Scatter Plot
+  // 1. Time-Confidence Scatter Plot — color by confidence band
   const scatterData = state.detections.map(d => ({ x: d.timestampSec, y: d.confidencePct }));
+  const scatterColors = scatterData.map(p =>
+    p.y >= 80 ? CHART_PALETTE.high
+    : p.y >= 50 ? CHART_PALETTE.mid
+    : CHART_PALETTE.low
+  );
   const ctxTime = document.getElementById('timeConfidenceChart')?.getContext('2d');
   if (ctxTime) {
     if (state.charts.timeConf) state.charts.timeConf.destroy();
@@ -671,9 +676,11 @@ function renderCharts() {
         datasets: [{
           label: 'Confidence/Time',
           data: scatterData,
-          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          backgroundColor: scatterColors,
+          borderColor: 'rgba(0,0,0,0.4)',
+          borderWidth: 0.5,
           pointRadius: 4,
-          hoverRadius: 6
+          hoverRadius: 7
         }]
       },
       options: {
@@ -702,7 +709,8 @@ function renderCharts() {
         labels: hoodItems.map(([name]) => name),
         datasets: [{
           data: hoodItems.map(([, count]) => count),
-          backgroundColor: '#ffffff',
+          backgroundColor: makeBarGradient(ctxHoodDensity, CHART_PALETTE.accent, 'h'),
+          borderRadius: 2,
           borderWidth: 0,
           maxBarThickness: 18
         }]
@@ -729,14 +737,22 @@ function renderCharts() {
         labels: polarLabels,
         datasets: [{
           data: polarData,
-          backgroundColor: ['#ffffff', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)'],
-          borderWidth: 0
+          backgroundColor: CHART_PALETTE.series.map(c => c + 'cc'),
+          borderColor: '#000',
+          borderWidth: 1.5
         }]
       },
       options: {
         ...chartOptions,
         plugins: { legend: { display: false } },
-        scale: { gridLines: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+        scales: {
+          r: {
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            angleLines: { color: 'rgba(255,255,255,0.06)' },
+            ticks: { display: false, backdropColor: 'transparent' },
+            pointLabels: { display: false }
+          }
+        }
       }
     });
   }
@@ -753,14 +769,22 @@ function renderCharts() {
         labels: ['معتمد', 'مستبعد', 'معلق'],
         datasets: [{
           data: [approved, rejected, pending],
-          backgroundColor: ['#ffffff', '#ff453a', 'rgba(255,255,255,0.1)'],
-          borderWidth: 0
+          backgroundColor: [CHART_PALETTE.success, CHART_PALETTE.danger, 'rgba(255,255,255,0.18)'],
+          borderColor: '#000',
+          borderWidth: 2,
+          hoverOffset: 6
         }]
       },
       options: {
         ...chartOptions,
-        cutoutPercentage: 80,
-        plugins: { legend: { display: true, position: 'right', labels: { color: '#666', font: { family: 'Cairo' } } } }
+        cutout: '72%',
+        plugins: {
+          legend: {
+            display: true,
+            position: 'right',
+            labels: { color: '#9ca3af', font: { family: 'Cairo', size: 11 }, boxWidth: 10, boxHeight: 10, padding: 10 }
+          }
+        }
       }
     });
   }
@@ -770,6 +794,7 @@ function renderCharts() {
   for (const d of state.detections) {
     buckets[Math.min(4, Math.floor(d.confidencePct / 20.1))] += 1;
   }
+  const bucketColors = [CHART_PALETTE.low, '#fb923c', CHART_PALETTE.warn, '#a3e635', CHART_PALETTE.success];
   const ctxConfidence = document.getElementById('confidenceDistChart')?.getContext('2d');
   if (ctxConfidence) {
     if (state.charts.confidenceDist) state.charts.confidenceDist.destroy();
@@ -777,7 +802,13 @@ function renderCharts() {
       type: 'bar',
       data: {
         labels: ['0-20', '21-40', '41-60', '61-80', '81-100'],
-        datasets: [{ data: buckets, backgroundColor: '#ffffff', borderWidth: 0, maxBarThickness: 22 }]
+        datasets: [{
+          data: buckets,
+          backgroundColor: bucketColors,
+          borderRadius: 2,
+          borderWidth: 0,
+          maxBarThickness: 28
+        }]
       },
       options: {
         ...chartOptions,
@@ -795,7 +826,13 @@ function renderCharts() {
       type: 'bar',
       data: {
         labels: densitySources.map((v) => formatVideoId(v.video_id)),
-        datasets: [{ data: densitySources.map((v) => v.detection_count), backgroundColor: '#ffffff', borderWidth: 0, maxBarThickness: 18 }]
+        datasets: [{
+          data: densitySources.map((v) => v.detection_count),
+          backgroundColor: makeBarGradient(ctxDensity, CHART_PALETTE.accent2, 'h'),
+          borderRadius: 2,
+          borderWidth: 0,
+          maxBarThickness: 18
+        }]
       },
       options: {
         ...chartOptions,
@@ -804,6 +841,29 @@ function renderCharts() {
       }
     });
   }
+}
+
+const CHART_PALETTE = {
+  accent: '#7dd3fc',     // cyan
+  accent2: '#a78bfa',    // violet
+  success: '#34d399',    // green
+  warn: '#fbbf24',       // amber
+  danger: '#ff453a',     // red
+  high: '#34d399',
+  mid: '#7dd3fc',
+  low: '#f87171',
+  series: ['#7dd3fc', '#a78bfa', '#fbbf24', '#34d399', '#fb7185', '#60a5fa']
+};
+
+function makeBarGradient(ctx, color, axis = 'h') {
+  if (!ctx) return color;
+  const canvas = ctx.canvas;
+  const g = axis === 'h'
+    ? ctx.createLinearGradient(0, 0, canvas.width || 200, 0)
+    : ctx.createLinearGradient(0, 0, 0, canvas.height || 200);
+  g.addColorStop(0, color + '40');
+  g.addColorStop(1, color);
+  return g;
 }
 
 const chartOptions = {

@@ -201,39 +201,39 @@ td { padding: 0.75rem; font-size: 0.8rem; border-bottom: 1px solid rgba(255, 255
 .pin-popup-elegant {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  min-width: 220px;
+  gap: 1rem;
+  min-width: 300px;
   transition: width 220ms ease, min-width 220ms ease, gap 220ms ease;
 }
-.popup-img { width: 60px; height: 60px; object-fit: cover; border-radius: 1px; border: 1px solid rgba(255, 255, 255, 0.1); }
-.popup-info { display: flex; flex-direction: column; gap: 0.2rem; }
-.popup-hood { font-size: 0.9rem; font-weight: 800; line-height: 1.2; color: #fff; }
-.popup-stats { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
+.popup-img { width: 88px; height: 88px; object-fit: cover; border-radius: 1px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.popup-info { display: flex; flex-direction: column; gap: 0.3rem; }
+.popup-hood { font-size: 1.05rem; font-weight: 800; line-height: 1.2; color: #fff; }
+.popup-stats { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
 .popup-sep { opacity: 0.3; }
 
 .pin-popup-elegant--expanded {
-  width: 300px;
-  min-width: 300px;
+  width: 400px;
+  min-width: 400px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 9px;
+  gap: 12px;
   animation: popup-grow 180ms ease-out;
 }
 .popup-img--expanded {
   width: 100%;
-  height: 138px;
+  height: 200px;
   flex: none;
 }
 .popup-info--expanded {
   min-width: 0;
-  gap: 8px;
+  gap: 10px;
   padding: 0;
 }
 .popup-id {
   margin-top: 3px;
   color: rgba(255, 255, 255, 0.45);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
   white-space: nowrap;
@@ -243,20 +243,20 @@ td { padding: 0.75rem; font-size: 0.8rem; border-bottom: 1px solid rgba(255, 255
 .popup-confidence {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .popup-confidence__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.64rem;
+  font-size: 0.76rem;
   font-weight: 800;
 }
 .popup-confidence__head strong {
   color: #fff;
   font-family: var(--font-head);
-  font-size: 0.86rem;
+  font-size: 1rem;
 }
 .popup-confidence__bar {
   height: 3px;
@@ -278,14 +278,14 @@ td { padding: 0.75rem; font-size: 0.8rem; border-bottom: 1px solid rgba(255, 255
 }
 .popup-details span {
   color: rgba(255, 255, 255, 0.45);
-  font-size: 0.62rem;
+  font-size: 0.74rem;
   font-weight: 800;
   white-space: nowrap;
 }
 .popup-details strong {
   color: rgba(255, 255, 255, 0.9);
   font-family: var(--font-head);
-  font-size: 0.72rem;
+  font-size: 0.86rem;
   font-weight: 800;
   text-align: left;
   white-space: nowrap;
