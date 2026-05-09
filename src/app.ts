@@ -41,7 +41,7 @@ function buildDependencies(overrides: AppOverrides = {}): {
     return { service, dynamicRepo: null };
   }
 
-  if (config.databaseUrl) {
+  if (config.databaseUrl && !config.pipelineMode) {
     const repository = new DetectionRepository(overrides.pool ?? getPool());
     const service = new DetectionService(repository, config.mediaBaseUrl);
     return { service, dynamicRepo: null };
