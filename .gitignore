@@ -22,6 +22,8 @@ pipeline/data/
 # run: git lfs pull   to download after cloning
 
 # Pipeline - inference frames (large images)
+pipeline/runs/inference/*/
+!pipeline/runs/inference/.gitkeep
 pipeline/runs/inference/*/frames/
 
 # Pipeline - test media (add your own)

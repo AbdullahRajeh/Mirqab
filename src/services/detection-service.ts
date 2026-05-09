@@ -32,7 +32,6 @@ export class DetectionService {
     latitude: string | number;
     longitude: string | number;
     image_path: string;
-    review_status?: "approved" | "rejected" | null;
   }): DetectionRecord {
     return {
       detection_id: row.detection_id,
@@ -46,7 +45,6 @@ export class DetectionService {
       confidence: Number(row.confidence),
       image_path: row.image_path,
       image_url: buildImageUrl(row.image_path, this.mediaBaseUrl),
-      review_status: row.review_status,
     };
   }
 
@@ -113,7 +111,6 @@ export class DetectionService {
         max_confidence: Number(row.max_confidence),
         image_path: row.image_path,
         image_url: buildImageUrl(row.image_path, this.mediaBaseUrl),
-        review_status: row.review_status,
       });
       grouped.set(row.video_id, points);
     }

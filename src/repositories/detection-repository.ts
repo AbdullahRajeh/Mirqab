@@ -10,7 +10,6 @@ export type DetectionRow = {
   latitude: string | number;
   longitude: string | number;
   image_path: string;
-  review_status?: "approved" | "rejected" | null;
   total_count?: number;
 };
 
@@ -49,7 +48,6 @@ export type MapRow = {
   detection_count: number;
   max_confidence: string | number;
   image_path: string;
-  review_status?: "approved" | "rejected" | null;
 };
 
 export type ReviewRecord = {
@@ -157,7 +155,6 @@ export class DetectionRepository implements DetectionRepositoryContract {
           d.latitude,
           d.longitude,
           d.image_path,
-          d.review_status,
           COUNT(*) OVER()::int AS total_count
         FROM detections d
         INNER JOIN videos v ON v.id = d.video_ref
@@ -233,8 +230,7 @@ export class DetectionRepository implements DetectionRepositoryContract {
           d.longitude,
           COUNT(*)::int AS detection_count,
           MAX(d.confidence) AS max_confidence,
-          MIN(d.image_path) AS image_path,
-          MAX(d.review_status) AS review_status
+          MIN(d.image_path) AS image_path
         FROM detections d
         INNER JOIN videos v ON v.id = d.video_ref
         ${whereClause}
@@ -322,83 +318,5 @@ export class DetectionRepository implements DetectionRepositoryContract {
       decision: row.decision,
       reviewed_at: row.reviewed_at,
     };
-  }
-
-  async importDetections(detections: any[]): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      for (const det of detections) {
-        const videoResult = await client.query<{ id: number }>(
-          `
-            INSERT INTO videos (video_id)
-            VALUES ($1)
-            ON CONFLICT (video_id) DO UPDATE SET video_id = EXCLUDED.video_id
-            RETURNING id
-          `,
-          [det.video_id],
-        );
-
-        const videoRef = videoResult.rows[0].id;
-
-        await client.query(
-          `
-            INSERT INTO detections (
-              detection_id,
-              video_ref,
-              frame_id,
-              video_timestamp_sec,
-              confidence,
-              latitude,
-              longitude,
-              gps,
-              image_path
-            )
-            VALUES (
-              $1,
-              $2,
-              $3::integer,
-              $4::numeric,
-              $5::numeric,
-              $6::numeric,
-              $7::numeric,
-              CASE 
-                WHEN $6 IS NOT NULL AND $7 IS NOT NULL THEN
-                  ST_SetSRID(ST_MakePoint($7::double precision, $6::double precision), 4326)::geography
-                ELSE NULL
-              END,
-              $8
-            )
-            ON CONFLICT (detection_id) DO UPDATE SET
-              video_ref = EXCLUDED.video_ref,
-              frame_id = EXCLUDED.frame_id,
-              video_timestamp_sec = EXCLUDED.video_timestamp_sec,
-              confidence = EXCLUDED.confidence,
-              latitude = EXCLUDED.latitude,
-              longitude = EXCLUDED.longitude,
-              gps = EXCLUDED.gps,
-              image_path = EXCLUDED.image_path
-          `,
-          [
-            det.detection_id,
-            videoRef,
-            det.frame_id,
-            det.video_timestamp_sec,
-            det.confidence,
-            det.gps?.latitude ?? null,
-            det.gps?.longitude ?? null,
-            det.image_path,
-          ],
-        );
-      }
-
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
   }
 }

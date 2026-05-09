@@ -10,7 +10,6 @@ export interface DetectionRecord {
   confidence: number;
   image_path: string;
   image_url: string;
-  review_status?: "approved" | "rejected" | null;
 }
 
 export interface DetectionListQuery {
@@ -59,7 +58,6 @@ export interface MapPoint {
   max_confidence: number;
   image_path: string;
   image_url: string;
-  review_status?: "approved" | "rejected" | null;
 }
 
 export interface FrameResponse {

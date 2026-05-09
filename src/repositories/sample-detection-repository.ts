@@ -102,7 +102,6 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
       latitude: detection.gps?.latitude ?? 0,
       longitude: detection.gps?.longitude ?? 0,
       image_path: detection.image_path,
-      review_status: this.reviews.get(detection.detection_id)?.decision ?? null,
     };
   }
 
@@ -211,16 +210,6 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
     return Array.from(grouped.values())
       .map((items) => {
         const [first] = items;
-        // Check if any detection in this frame is approved/rejected
-        let status: "approved" | "rejected" | null = null;
-        for (const item of items) {
-          const rev = this.reviews.get(item.detection_id);
-          if (rev) {
-            status = rev.decision;
-            break;
-          }
-        }
-
         return {
           video_id: first.video_id,
           frame_id: first.frame_id,
@@ -232,7 +221,6 @@ export class SampleDetectionRepository implements DetectionRepositoryContract {
           image_path: [...items]
             .map((item) => item.image_path)
             .sort((left, right) => left.localeCompare(right))[0],
-          review_status: status,
         };
       })
       .sort((left, right) => {

@@ -55,14 +55,8 @@ async function checkSystemHealth() {
   try {
     const res = await fetch(HEALTH_ENDPOINT);
     const data = await res.json();
-    
-    if (data.pipeline?.model === "ready") {
-      state.isSystemReady = true;
-    } else if (data.pipeline?.model === "lfs_pointer") {
-      state.isSystemReady = false;
-    } else {
-      state.isSystemReady = false;
-    }
+
+    state.isSystemReady = res.ok && data.status === "ok";
   } catch {
     state.isSystemReady = false;
   }
@@ -182,7 +176,12 @@ async function pollStatus(id) {
     let progress = Math.max(25, data.progress || 0);
     updateProgress(progress, getStatusLabel(data.status));
 
-    if (data.status === "complete") break;
+    if (data.status === "complete") {
+      if (data.warning) {
+        showNotifier(data.warning, false);
+      }
+      break;
+    }
     if (data.status === "failed") throw new Error(data.error || "فشلت المعالجة");
     
     await new Promise(r => setTimeout(r, POLLING_INTERVAL));
@@ -192,7 +191,8 @@ async function pollStatus(id) {
 function getStatusLabel(status) {
   switch (status) {
     case "queued": return "في قائمة الانتظار...";
-    case "processing": return "جاري تشغيل تحليل الذكاء الاصطناعي...";
+    case "inference": return "جاري تشغيل تحليل الذكاء الاصطناعي...";
+    case "gps": return "جاري استخراج إحداثيات GPS...";
     case "complete": return "اكتملت المعالجة";
     case "failed": return "فشلت المعالجة";
     default: return "جاري العمل...";

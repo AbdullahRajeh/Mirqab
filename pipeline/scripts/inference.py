@@ -193,7 +193,11 @@ def run_video_inference(model, args, output_dir):
 
     cap.release()
     writer.release()
-    cv2.destroyAllWindows()
+    if args.show:
+        try:
+            cv2.destroyAllWindows()
+        except cv2.error:
+            pass
     elapsed = time.time() - start
 
     print(f"\n  Total frames: {frame_idx}")
@@ -209,14 +213,6 @@ def run_inference(args):
     if not os.path.exists(args.model):
         print(f"ERROR: model not found: {args.model}")
         sys.exit(1)
-
-    # Check for Git LFS pointer
-    with open(args.model, "rb") as f:
-        header = f.read(100)
-        if header.startswith(b"version https://git-lfs"):
-            print("ERROR: model/best.pt is a Git LFS pointer, not the real binary file.")
-            print("Please install git-lfs and run 'git lfs pull', or copy the real model file manually.")
-            sys.exit(1)
 
     if torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
