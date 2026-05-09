@@ -196,6 +196,11 @@
             </div>
             <div class="stream-tools">
               <select id="video-filter" class="technical-select"><option value="">كل المصادر</option></select>
+              <select id="page-size" class="technical-select" aria-label="عدد الصفوف">
+                <option value="50">50 صف</option>
+                <option value="100">100 صف</option>
+                <option value="200" selected>200 صف</option>
+              </select>
               <button id="btn-refresh" class="btn-technical">تحديث البيانات</button>
             </div>
           </div>
@@ -212,6 +217,7 @@
                   <th><button type="button" class="sort-header" data-sort="confidence">نسبة الثقة</button></th>
                   <th><button type="button" class="sort-header" data-sort="coordinates">الإحداثيات</button></th>
                   <th><button type="button" class="sort-header" data-sort="status">الحالة</button></th>
+                  <th>الإجراء</th>
                 </tr>
               </thead>
               <tbody id="pins-body"></tbody>
@@ -219,7 +225,11 @@
           </div>
 
           <div class="stream-footer">
-            <span class="stream-note">يعرض السجل أحدث 200 بلاغ ضمن النطاق المحدد.</span>
+            <span id="stream-note" class="stream-note">يعرض السجل أحدث 200 بلاغ ضمن النطاق المحدد.</span>
+            <div class="pagination">
+              <button id="btn-prev-page" type="button" class="btn-arrow" aria-label="الصفحة السابقة">↑</button>
+              <button id="btn-next-page" type="button" class="btn-arrow" aria-label="الصفحة التالية">↓</button>
+            </div>
           </div>
         </main>
 
@@ -239,8 +249,8 @@
             <div id="review-meta" class="monitor-readout"></div>
 
             <div class="monitor-controls">
-              <button id="btn-approve" class="btn-confirm">اعتماد</button>
-              <button id="btn-reject" class="btn-reject">استبعاد</button>
+              <button id="btn-approve" class="btn-confirm">استعادة البلاغ</button>
+              <button id="btn-reject" class="btn-reject">حذف كإيجابي كاذب</button>
             </div>
             <div id="review-guest-note" class="review-guest-note" hidden>
               وضع العرض فقط. تسجيل دخول المشرف مطلوب للاعتماد أو الاستبعاد.

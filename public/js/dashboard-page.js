@@ -54,12 +54,15 @@ const sourceListEl = document.getElementById("source-list");
 const statsScopeEl = document.getElementById("stats-scope");
 const hotspotSummaryEl = document.getElementById("hotspot-summary");
 const pinsBody = document.getElementById("pins-body");
+const pinsTable = document.getElementById("pins-table");
 
 const videoFilterEl = document.getElementById("video-filter");
+const pageSizeEl = document.getElementById("page-size");
 const btnRefresh = document.getElementById("btn-refresh");
 const pageInfoEl = document.getElementById("page-info");
 const btnPrevPage = document.getElementById("btn-prev-page");
 const btnNextPage = document.getElementById("btn-next-page");
+const streamNoteEl = document.getElementById("stream-note");
 
 const reviewImage = document.getElementById("review-image");
 const reviewImageTrigger = document.getElementById("review-image-trigger");
@@ -81,6 +84,7 @@ const imageViewerZoomIn = document.getElementById("image-viewer-zoom-in");
 const imageViewerZoomOut = document.getElementById("image-viewer-zoom-out");
 const imageViewerClose = document.getElementById("image-viewer-close");
 const sortHeaderButtons = Array.from(document.querySelectorAll(".sort-header"));
+const SERVER_SORT_COLUMNS = new Set(["videoId", "timestampSec", "frameId", "confidence", "detectionId"]);
 
 const state = {
   detections: [],
@@ -135,6 +139,9 @@ function readControlsFromDom() {
   if (videoFilterEl instanceof HTMLSelectElement) {
     state.videoId = videoFilterEl.value.trim();
   }
+  if (pageSizeEl instanceof HTMLSelectElement) {
+    state.limit = Number.parseInt(pageSizeEl.value, 10) || 200;
+  }
 }
 
 function bindUi() {
@@ -150,10 +157,32 @@ function bindUi() {
     }
   });
 
+  pageSizeEl?.addEventListener("change", () => {
+    if (pageSizeEl instanceof HTMLSelectElement) {
+      state.limit = Number.parseInt(pageSizeEl.value, 10) || 200;
+      state.offset = 0;
+      void loadAll({ resetSelection: true });
+    }
+  });
+
   for (const button of sortHeaderButtons) {
     button.addEventListener("click", () => {
       const sortBy = button.dataset.sort;
       if (!isSortableColumn(sortBy)) {
+        return;
+      }
+      if (SERVER_SORT_COLUMNS.has(sortBy)) {
+        if (state.sortBy === sortBy) {
+          state.sortOrder = state.sortOrder === "desc" ? "asc" : "desc";
+        } else {
+          state.sortBy = sortBy;
+          state.sortOrder = "desc";
+        }
+        state.listSortBy = "";
+        state.listSortOrder = "";
+        state.offset = 0;
+        renderSortHeaders();
+        void loadAll({ resetSelection: true });
         return;
       }
       if (state.listSortBy !== sortBy) {
@@ -235,6 +264,16 @@ function bindUi() {
     if (!(row instanceof HTMLTableRowElement)) {
       return;
     }
+    const action = target.closest("[data-action][data-id]");
+    if (action instanceof HTMLElement) {
+      const id = action.dataset.id;
+      if (id && action.dataset.action === "delete") {
+        void submitReview("rejected", id);
+      } else if (id && action.dataset.action === "restore") {
+        void submitReview("approved", id);
+      }
+      return;
+    }
     const id = row.dataset.detectionId;
     if (id) {
       selectDetection(id);
@@ -255,6 +294,11 @@ function bindUi() {
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       navigateQueue(-1);
+    } else if ((event.key === "Delete" || event.key === "Backspace") && state.activeDetectionId) {
+      if (state.reviews.get(state.activeDetectionId) !== "rejected") {
+        event.preventDefault();
+        void submitReview("rejected");
+      }
     } else if (event.key === "Escape" && !(imageViewer?.hidden ?? true)) {
       event.preventDefault();
       closeImageViewer();
@@ -262,21 +306,21 @@ function bindUi() {
   });
 }
 
-function getPendingQueue() {
-  return state.detections.filter((d) => !state.reviews.has(d.id));
+function getActiveQueue() {
+  return state.detections.filter((d) => state.reviews.get(d.id) !== "rejected");
 }
 
 function navigateQueue(delta) {
-  const pending = getPendingQueue();
-  if (pending.length === 0) {
+  const queue = getActiveQueue();
+  if (queue.length === 0) {
     return;
   }
-  let idx = pending.findIndex((d) => d.id === state.activeDetectionId);
+  let idx = queue.findIndex((d) => d.id === state.activeDetectionId);
   if (idx < 0) {
     idx = delta > 0 ? -1 : 0;
   }
-  idx = Math.min(pending.length - 1, Math.max(0, idx + delta));
-  selectDetection(pending[idx].id);
+  idx = Math.min(queue.length - 1, Math.max(0, idx + delta));
+  selectDetection(queue[idx].id);
 }
 
 function selectDetection(id) {
@@ -309,11 +353,11 @@ async function loadAll({ resetSelection }) {
     renderCharts();
 
     if (resetSelection) {
-      const pending = getPendingQueue();
-      state.activeDetectionId = pending[0]?.id ?? state.detections[0]?.id ?? null;
+      const queue = getActiveQueue();
+      state.activeDetectionId = queue[0]?.id ?? state.detections[0]?.id ?? null;
     } else if (state.activeDetectionId && !state.detections.some((d) => d.id === state.activeDetectionId)) {
-      const pending = getPendingQueue();
-      state.activeDetectionId = pending[0]?.id ?? state.detections[0]?.id ?? null;
+      const queue = getActiveQueue();
+      state.activeDetectionId = queue[0]?.id ?? state.detections[0]?.id ?? null;
     }
 
     renderReviewPanel();
@@ -366,10 +410,10 @@ function fillVideoFilter(items) {
   videoFilterEl.innerHTML = options.join("");
 }
 
-async function submitReview(decision) {
-  const id = state.activeDetectionId;
+async function submitReview(decision, overrideId) {
+  const id = overrideId ?? state.activeDetectionId;
   if (!state.isAdmin) {
-    setMessage("يلزم تسجيل دخول المشرف لاعتماد أو استبعاد البلاغات.", true);
+    setMessage("يلزم تسجيل دخول المشرف لحذف أو استعادة البلاغات.", true);
     return;
   }
   if (!id) {
@@ -389,20 +433,24 @@ async function submitReview(decision) {
       body: JSON.stringify({ decision }),
     });
     
-    const wasAlreadyReviewed = state.reviews.has(id);
     state.reviews.set(id, decision);
-    
-    // Only move to next if it was a first-time review
-    if (!wasAlreadyReviewed) {
-      const pending = getPendingQueue();
-      state.activeDetectionId = pending[0]?.id ?? null;
+
+    if (decision === "rejected" && id === state.activeDetectionId) {
+      const deletedIndex = state.detections.findIndex((d) => d.id === id);
+      const queue = getActiveQueue();
+      const next = state.detections
+        .slice(Math.max(0, deletedIndex + 1))
+        .find((d) => queue.some((item) => item.id === d.id));
+      state.activeDetectionId = next?.id ?? queue[0]?.id ?? id;
+    } else {
+      state.activeDetectionId = id;
     }
 
     renderStats();
     renderTable();
     renderReviewPanel();
     renderCharts();
-    setMessage(decision === "approved" ? "تم الاعتماد." : "تم الاستبعاد.", false);
+    setMessage(decision === "approved" ? "تمت استعادة البلاغ." : "تم حذف البلاغ كإيجابي كاذب.", false);
   } catch (error) {
     console.error(error);
     setMessage(error instanceof Error ? error.message : "تعذر حفظ المراجعة.", true);
@@ -770,25 +818,33 @@ function renderPagination() {
   const from = state.total === 0 ? 0 : state.offset + 1;
   const to = Math.min(state.offset + state.detections.length, state.total);
   pageInfoEl.textContent = `${from}-${to} // ${state.total}`;
+  if (streamNoteEl) {
+    streamNoteEl.textContent = `يعرض السجل ${state.detections.length} من أصل ${state.total} بلاغ ضمن النطاق المحدد.`;
+  }
   if (btnPrevPage instanceof HTMLButtonElement) btnPrevPage.disabled = state.offset <= 0;
   if (btnNextPage instanceof HTMLButtonElement) btnNextPage.disabled = state.offset + state.limit >= state.total;
 }
 
 function renderSortHeaders() {
   for (const button of sortHeaderButtons) {
-    const isActive = button.dataset.sort === state.listSortBy;
+    const sortKey = button.dataset.sort;
+    const isServerActive = sortKey === state.sortBy && SERVER_SORT_COLUMNS.has(sortKey);
+    const isListActive = sortKey === state.listSortBy;
+    const isActive = isServerActive || isListActive;
     button.classList.toggle("is-active", isActive);
-    button.dataset.direction = isActive ? (state.listSortOrder === "asc" ? "↑" : "↓") : "";
-    button.title = isActive
-      ? "اضغط مرة أخرى لعكس الترتيب، ثم مرة ثالثة لإزالة الترتيب"
-      : "ترتيب القائمة";
+    button.dataset.direction = isActive
+      ? ((isServerActive ? state.sortOrder : state.listSortOrder) === "asc" ? "↑" : "↓")
+      : "";
+    button.title = SERVER_SORT_COLUMNS.has(sortKey)
+      ? "ترتيب من الخادم لكل النتائج"
+      : "ترتيب القائمة الحالية";
   }
 }
 
 function renderTable() {
   if (!pinsBody) return;
   if (state.detections.length === 0) {
-    pinsBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--muted); font-style:italic;">لا توجد بيانات متاحة</td></tr>';
+    pinsBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--muted); font-style:italic;">لا توجد بيانات متاحة</td></tr>';
     return;
   }
 
@@ -797,11 +853,18 @@ function renderTable() {
       const decision = state.reviews.get(d.id);
       const badge = decision
         ? decision === "approved"
-          ? '<span style="color:var(--fg); font-weight:900;">تم الاعتماد</span>'
-          : '<span style="color:var(--muted);">مستبعد</span>'
+          ? '<span class="status-badge status-badge--approved">مستعاد</span>'
+          : '<span class="status-badge status-badge--deleted">محذوف</span>'
         : '<span style="color:var(--muted); opacity:0.3;">قيد المراجعة</span>';
       
-      const rowClass = d.id === state.activeDetectionId ? ' class="pin-row--selected"' : "";
+      const actionCell = decision === "rejected"
+        ? `<button type="button" class="row-action row-action--restore" data-action="restore" data-id="${escapeHtml(d.id)}">استعادة</button>`
+        : `<button type="button" class="row-action row-action--delete" data-action="delete" data-id="${escapeHtml(d.id)}">حذف</button>`;
+      const rowClasses = [
+        d.id === state.activeDetectionId ? "pin-row--selected" : "",
+        decision === "rejected" ? "pin-row--deleted" : "",
+      ].filter(Boolean).join(" ");
+      const rowClass = rowClasses ? ` class="${rowClasses}"` : "";
       
       return `
         <tr${rowClass} data-detection-id="${escapeHtml(d.id)}">
@@ -816,6 +879,7 @@ function renderTable() {
           </td>
           <td class="mono" style="font-size:0.68rem; opacity:0.55;">${formatCoordinates(d.lat, d.lng)}</td>
           <td>${badge}</td>
+          <td>${actionCell}</td>
         </tr>
       `;
     })
@@ -824,6 +888,7 @@ function renderTable() {
 
 function renderReviewPanel() {
   const d = state.detections.find((item) => item.id === state.activeDetectionId) ?? null;
+  const activeDecision = d ? state.reviews.get(d.id) : undefined;
   if (!d) {
     if (reviewImageTrigger) reviewImageTrigger.hidden = true;
     if (reviewEmpty) reviewEmpty.hidden = false;
@@ -839,16 +904,18 @@ function renderReviewPanel() {
 
   if (btnApprove) {
     btnApprove.disabled = !state.isAdmin;
-    btnApprove.classList.toggle("is-active", state.reviews.get(d.id) === "approved");
+    btnApprove.hidden = activeDecision !== "rejected";
+    btnApprove.classList.toggle("is-active", activeDecision === "approved");
   }
   if (btnReject) {
     btnReject.disabled = !state.isAdmin;
-    btnReject.classList.toggle("is-active", state.reviews.get(d.id) === "rejected");
+    btnReject.hidden = activeDecision === "rejected";
+    btnReject.classList.toggle("is-active", activeDecision === "rejected");
   }
 
   if (reviewMeta) {
     const decision = state.reviews.get(d.id);
-    const status = decision ? (decision === "approved" ? "تم الاعتماد" : "مستبعد") : "قيد المراجعة";
+    const status = decision ? (decision === "approved" ? "مستعاد" : "محذوف كإيجابي كاذب") : "قيد المراجعة";
     const mapUrl = `/map?focus=${encodeURIComponent(d.pointId)}`;
     const rows = [
       { label: "معرف البلاغ", value: d.id, wide: false },
