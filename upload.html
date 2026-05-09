@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIRQAB / UPLOAD_WIZARD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Changa:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/upload.css" />
+  </head>
+  <body class="mirqab-upload-page">
+    <div class="shutter" id="shutter"></div>
+    <div class="canvas">
+      <div class="canvas-lines"></div>
+      <div class="canvas-noise"></div>
+    </div>
+
+    <div class="upload-wrapper">
+      <header class="upload-header">
+        <div class="brand">
+          <span class="id-tag">MIRQAB // INGESTION_MODULE</span>
+          <h1>تحميل ومعالجة البيانات</h1>
+        </div>
+        <nav>
+          <a href="/map" class="btn-back">العودة للخريطة</a>
+        </nav>
+      </header>
+
+      <!-- Stepper Indicator -->
+      <nav class="upload-stepper">
+        <div class="step active" id="step-dot-1">
+          <span class="num">01</span>
+          <span class="label">اختيار الملف</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step-dot-2">
+          <span class="num">02</span>
+          <span class="label">معالجة الذكاء الاصطناعي</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="id-dot-3">
+          <span class="num">03</span>
+          <span class="label">مراجعة النتائج</span>
+        </div>
+      </nav>
+
+      <main class="upload-content">
+        <!-- Step 1: Selection -->
+        <section id="step-1" class="step-section active">
+          <div class="glass-card upload-zone" id="drop-zone">
+            <input type="file" id="file-input" accept="video/*,.mov,.MOV" hidden />
+            <div class="upload-icon">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            </div>
+            <h3>اسحب ملف الفيديو هنا</h3>
+            <p>أو اضغط لاختيار ملف من جهازك</p>
+            <button class="btn-primary" id="select-btn">اختيار ملف</button>
+            
+            <div class="upload-config">
+              <div class="config-item">
+                <label for="skip-frames">معدل تخطي الإطارات</label>
+                <input type="number" id="skip-frames" value="30" min="1" max="120" />
+                <span class="hint">كلما زاد الرقم، زادت سرعة المعالجة. يُنصح بـ 30 للفيديوهات الطويلة.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 2: Processing -->
+        <section id="step-2" class="step-section">
+          <div class="glass-card processing-card">
+            <div class="processing-visual">
+              <div class="scanner-line"></div>
+              <div class="processing-circles">
+                <div class="circle c1"></div>
+                <div class="circle c2"></div>
+                <div class="circle c3"></div>
+              </div>
+            </div>
+            <div class="processing-info">
+              <h2 id="process-title">جاري تحليل الفيديو...</h2>
+              <p id="process-subtitle">يقوم النظام الآن بتشغيل خوارزميات الرؤية الحاسوبية لاكتشاف العيوب.</p>
+              
+              <div class="progress-wrap">
+                <div class="progress-meta">
+                  <span id="progress-pct">0%</span>
+                  <span id="progress-status">تجهيز البيئة...</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" id="progress-fill"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 3: Results -->
+        <section id="step-3" class="step-section">
+          <div class="results-header">
+            <h2>تم اكتمال المعالجة بنجاح</h2>
+            <p>تم اكتشاف <span id="detection-count">0</span> عيباً في الفيديو المرفوع.</p>
+            <div class="results-actions">
+              <button class="btn-primary" id="view-dashboard-btn">العودة للخريطة</button>
+              <button class="btn-secondary" id="restart-btn">رفع ملف آخر</button>
+            </div>
+          </div>
+          
+          <div class="frames-grid" id="frames-grid">
+            <!-- Frames will be injected here -->
+          </div>
+        </section>
+      </main>
+
+      <p id="message" class="system-message" aria-live="polite"></p>
+    </div>
+
+    <script type="module" src="/js/upload-page.js"></script>
+    <script type="module" src="/js/auth.js"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const shutter = document.getElementById('shutter');
+        setTimeout(() => shutter?.classList.add('dismiss'), 50);
+        document.querySelectorAll('a').forEach(link => {
+          link.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('http')) return;
+            e.preventDefault();
+            shutter?.classList.remove('dismiss');
+            if (!shutter) {
+              window.location.href = href;
+              return;
+            }
+            shutter.style.transform = 'translateY(100%)';
+            shutter.offsetHeight;
+            shutter.style.transition = 'transform 0.4s cubic-bezier(0.19, 1, 0.22, 1)';
+            shutter.style.transform = 'translateY(0)';
+            setTimeout(() => window.location.href = href, 350);
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

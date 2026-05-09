@@ -99,6 +99,9 @@ export function createApp(overrides: AppOverrides = {}): express.Express {
   app.get("/dashboard", requireAdminPage, (_req, res) => {
     res.sendFile(config.dashboardPagePath);
   });
+  app.get("/upload", requireAdminPage, (_req, res) => {
+    res.sendFile(config.uploadPagePath);
+  });
 
   app.use(
     createRouter({
