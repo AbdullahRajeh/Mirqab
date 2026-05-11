@@ -1,4 +1,4 @@
-## Mirqab
+# Mirqab
 
 # Getting Started
 
