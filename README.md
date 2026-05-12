@@ -1,18 +1,92 @@
-# Mirqab
+# مرقاب — MIRQAB
 
-# Getting Started
+### A Smart Pothole Detection System for Drone Footage
 
-Pothole detection dashboard — upload a drone video, the model runs locally, results appear on the map.
+> Graduation Project · Imam Mohammad Ibn Saud Islamic University   
+> Supervised by **Dr. Saad Alabbad**
+
+---
+
+## Overview
+
+Manual road inspection is slow, expensive, and often unreliable. MIRQAB automates this process by combining **drone footage**, **YOLOv8 deep learning**, and **EasyOCR GPS extraction** to detect potholes, pin them on an interactive map, and generate actionable reports — all without human intervention in the field.
+
+---
+
+## Team
+
+
+| Name                 
+| ------------------------ 
+| Nayan Mazen Alharbi      
+| Abdullah Rajeh Alshehri 
+| Ziyad Abdulaziz Almansif 
+| Mazen Saleh AlAbdulalfar 
+
+---
+
+![MIRQAB Poster](docs/gp2_poster_page-0001.jpg)
+
+---
+
+## System Architecture
+
+```
+Drone Camera → Video Acquisition → GPS Module
+       ↓
+YOLOv8 Object Detection → Frame Analysis → OCR GPS Extraction
+       ↓
+Detection Storage → REST API → PostgreSQL + PostGIS
+       ↓
+Interactive Map · Detection Review · Statistics & Reports
+```
+
+### Pipeline at a glance
+
+1. **Drone Subsystem** — captures video with embedded OSD GPS data
+2. **AI Detection** — YOLOv8 runs per-frame pothole detection; annotated frames are saved with bounding boxes
+3. **GPS Extraction** — EasyOCR reads the drone's on-screen GPS coordinates from each detected frame
+4. **Backend** — Node.js + Express REST API stores results in PostgreSQL/PostGIS
+5. **Dashboard** — Leaflet map pins every detection; analytics view shows statistics and lets you review annotated frames
+
+---
+
+## Technologies
+
+
+| Layer     | Technology              |
+| --------- | ----------------------- |
+| AI Model  | YOLOv8                  |
+| OCR       | EasyOCR                 |
+| Backend   | Node.js + Express       |
+| Frontend  | HTML / CSS / JavaScript |
+| Database  | PostgreSQL + PostGIS    |
+| Mapping   | Leaflet                 |
+| Languages | Python & TypeScript     |
+
+
+---
+
+## Features
+
+- Accurate pothole detection via fine-tuned YOLOv8
+- GPS coordinates automatically linked to each detection
+- Real-time upload and processing with a live progress bar
+- Interactive map dashboard — pan, zoom, and inspect every pin
+- Annotated frames saved with YOLO bounding boxes
+- Scalable road-monitoring workflow requiring no manual field effort
+
+---
 
 ## Requirements
 
 - [Node.js 20+](https://nodejs.org/)
 - [Python 3.10+](https://www.python.org/)
-- [Git LFS](https://git-lfs.com/) for model weights and test media
+- [Git LFS](https://git-lfs.com/) — for model weights and test media
 
 ---
 
-## Setup (do this once)
+## Setup
 
 ### 1. Pull LFS assets
 
@@ -20,7 +94,7 @@ Pothole detection dashboard — upload a drone video, the model runs locally, re
 git lfs pull
 ```
 
-This downloads `pipeline/models/best.pt` and the demo upload video.
+Downloads `pipeline/models/best.pt` and the demo upload video.
 
 ### 2. Install Node dependencies
 
@@ -34,43 +108,61 @@ npm install
 npm run setup:pipeline
 ```
 
-On Windows this creates `pipeline\venv` and installs the inference dependencies from
-`pipeline\requirements.txt`. The committed `.env` already points the upload worker at
-that venv and serves media from `pipeline`.
+On Windows this creates `pipeline\venv` and installs inference dependencies from `pipeline\requirements.txt`.
 
 ---
 
-## Running the app
+## Running the App
 
 ```bash
 npm start
 ```
 
-Open **http://localhost:3000** in your browser, log in with:
-- Username: `admin`
-- Password: `admin123`
+Open **[http://localhost:3000](http://localhost:3000)** and log in:
+
+
+| Field    | Value      |
+| -------- | ---------- |
+| Username | `admin`    |
+| Password | `admin123` |
+
 
 ---
 
-## Uploading a video
+## Uploading a Video
 
-1. Go to the Dashboard
+1. Go to the **Dashboard**
 2. Click **اختيار ملف فيديو** and pick a drone video (`.mp4`, `.mov`, `.avi`)
-3. Set **تخطي الإطارات** (skip frames) — higher = faster but fewer detections. **30** is a good starting point
+3. Set **تخطي الإطارات** (skip frames) — higher = faster, fewer detections. **30** is a good default
 4. Wait for the progress bar to reach 100%
-5. The dashboard reloads automatically with the new detections and map pins
+5. The dashboard reloads automatically with new detections pinned on the map
 
-For a full local test, use `for_testing\dji.mov`.
+For a quick local test use `for_testing\dji.mov`.
 
-> Processing time depends on video length and whether you have a GPU. A 5-minute video at skip=30 takes ~2 minutes on CPU.
+> Processing time depends on video length and GPU availability.  
+> A 5-minute video at skip=30 takes ~2 minutes on CPU.
 
 ---
 
-## What changed in this branch
+## Known Challenges
 
-- **Real upload flow** — the dashboard now accepts actual video files and runs the YOLOv8 model locally
-- **Live progress bar** — reflects real inference progress, not a fake timer
-- **Annotated frames** — detected frames are saved with YOLO bounding boxes drawn on them
-- **Hot-swap** — after processing, the dashboard updates without restarting the server
-- **Skip frames control** — pick speed vs. accuracy from the UI
-- **GPS extraction** — uploads run EasyOCR after inference to attach drone OSD coordinates to each detection
+- OCR accuracy degrades under motion blur
+- GPS extraction reliability varies with OSD font and size
+- Long inference time for full-resolution videos
+- Handling large drone video files (multi-GB)
+
+---
+
+## Future Work
+
+- Real-time drone video streaming
+- Multi-drone concurrent support
+- Mobile application integration
+- Improved GPS precision and coordinate smoothing
+- Advanced road damage classification (cracks, rutting, etc.)
+
+---
+
+## Conclusion
+
+MIRQAB provides a smart, scalable solution for automated road inspection using drones and AI. It reduces manual effort, improves inspection efficiency, and supports safer road maintenance operations.
