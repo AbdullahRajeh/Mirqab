@@ -18,7 +18,7 @@ Manual road inspection is slow, expensive, and often unreliable. MIRQAB automate
 
 | Name                 
 | ------------------------ 
-| Nayan Mazen Alharbi      
+| Rayan Mazen Alharbi      
 | Abdullah Rajeh Alshehri 
 | Ziyad Abdulaziz Almansif 
 | Mazen Saleh AlAbdulalfar 
